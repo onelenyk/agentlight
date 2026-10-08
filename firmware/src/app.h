@@ -5,13 +5,15 @@
 //   api      — веб-сервер, сторінка, REST  mcp    — MCP-сервер
 //   hook     — прийом хуків агентів у їхньому власному форматі
 //   ble      — налаштування WiFi по Bluetooth    ota    — оновлення прошивки по WiFi
+//   timer    — таймер фокусу (логіка в focus.h, жести — у gesture.h: обидва перевіряються тестами на комп'ютері)
 #pragma once
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
 #include <WebServer.h>
+#include "focus.h"
 
-#define FW_VERSION "0.7.1"
+#define FW_VERSION "0.8.0"
 #define HOSTNAME   "agentlight"
 
 const uint8_t FRAME_MS = 25;
@@ -26,14 +28,18 @@ const uint8_t MAX_BRIGHTNESS = 255;   // без стелі: корпус на 3 
 enum State : int8_t { ST_IDLE, ST_DONE, ST_BUSY, ST_WAITING, ST_ERROR, ST_COUNT };
 extern const char* const STATE_NAMES[ST_COUNT];
 
-// Режими лампи: показувати стан агентів або просто світити
-enum Mode : uint8_t { MODE_AGENTS, MODE_LAMP, MODE_COUNT };
+// Режими лампи: показувати стан агентів, просто світити або відлічувати час роботи й перерви.
+// Перемикаються зі сторінки або довгим утриманням сенсора: лампа по черзі показує колір кожного режиму.
+enum Mode : uint8_t { MODE_AGENTS, MODE_LAMP, MODE_FOCUS, MODE_COUNT };
 extern const char* const MODE_NAMES[MODE_COUNT];
+extern const uint32_t    MODE_COLORS[MODE_COUNT];
 
 // Жести сенсора і дії, які на них можна призначити (окремо в кожному режимі)
 enum Gesture : uint8_t { G_TAP, G_DOUBLE, G_HOLD, G_COUNT };
 extern const char* const GESTURE_NAMES[G_COUNT];
-enum Action : uint8_t { ACT_NONE, ACT_DISMISS, ACT_BRIGHT, ACT_TOGGLE, ACT_MODE, ACT_NEXT_ANIM, ACT_NEXT_COLOR, ACT_COUNT };
+enum Action : uint8_t { ACT_NONE, ACT_DISMISS, ACT_BRIGHT, ACT_TOGGLE, ACT_MODE, ACT_NEXT_ANIM, ACT_NEXT_COLOR,
+                        ACT_SLEEP, ACT_SIGNAL, ACT_WEBHOOK, ACT_SPARK, ACT_FOCUS_TOGGLE, ACT_FOCUS_SKIP, ACT_FOCUS_RESET,
+                        ACT_COUNT };    // нові дії — лише в кінець: номери зберігаються в налаштуваннях
 extern const char* const ACTION_NAMES[ACT_COUNT];
 bool actionFits(uint8_t action, Mode mode);     // чи має дія сенс у цьому режимі
 
@@ -60,7 +66,14 @@ struct Settings {
   uint8_t  lampAnim = AN_SOLID;
   uint16_t lampOffMin = 0;            // режим лампи: вимкнутись через стільки хвилин; 0 — світити завжди
   uint32_t lampColor = 0xFFB060;      // теплий білий
+  uint16_t focusWorkMin = 25;         // режим фокусу: робота, хв
+  uint16_t focusBreakMin = 5;         // режим фокусу: перерва, хв
+  uint16_t sleepMin = 15;             // таймер сну: за стільки хвилин світло плавно згасає
+  uint8_t  focusQuiet = 1;            // під час роботи не показувати, що агент чекає
+  uint8_t  focusTouch[G_COUNT] = {ACT_FOCUS_TOGGLE, ACT_FOCUS_SKIP, ACT_FOCUS_RESET};
 };
+extern String webhookUrl;             // адреса для дії «запит на адресу»; зберігається окремо від блоку налаштувань
+void     setWebhook(const String& url);
 uint8_t& touchAction(Mode mode, Gesture gesture);
 void     setMode(Mode mode);
 extern Settings    cfg;
@@ -84,14 +97,24 @@ uint32_t lampSecondsLeft();                     // скільки лишилос
 void render();
 void startRainbow(uint32_t ms);
 void startPreview(State st, uint32_t ms);        // показати вигляд стану незалежно від агентів
+void lightPick(int8_t mode);                    // під час вибору режиму утриманням: показати його колір; -1 — вибір закінчено
+void startSleep();                              // режим лампи: плавно згасити за cfg.sleepMin хвилин
+uint32_t sleepSecondsLeft();
 void flash(uint16_t ms = 80);
 void lightSolid(uint32_t rgb);                  // одразу, поза render(): під час оновлення loop() стоїть
 
 // ---- touch ----
 extern bool     touchRaw;
 extern uint32_t touchCount, touchAt;
+extern uint32_t signalCount, signalAt;          // дія «сигнал агентові»: скільки разів і коли востаннє
 void touchBegin();
 void pollTouch();
+void runAction(uint8_t action, const char* gesture = "page");
+
+// ---- timer ----
+extern Focus focus;
+void pollFocus();
+void fillFocus(JsonObject o);
 
 // ---- net ----
 struct Net { String ssid; int rssi; };
@@ -103,6 +126,7 @@ void   addNet(const char* ssid, const char* pass);
 void   forgetNet(const char* ssid);             // порожній рядок — забути всі
 size_t scanNets(Net* out, size_t max);          // мережі поруч без повторів, найсильніші перші
 void   fillWifi(JsonObject w);
+void   fireWebhook(const char* gesture);        // POST на webhookUrl; лише http, чекає щонайбільше 1,5 с
 
 // ---- api ----
 extern WebServer server;

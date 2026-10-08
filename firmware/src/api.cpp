@@ -31,6 +31,11 @@ void fillStatus(JsonObject o) {
   o["mode"] = MODE_NAMES[cfg.mode];
   o["off"] = lightOff;
   o["lamp_left"] = lampSecondsLeft();
+  o["sleep_left"] = sleepSecondsLeft();
+  fillFocus(o["focus"].to<JsonObject>());
+  JsonObject sig = o["signal"].to<JsonObject>();     // дія сенсора «сигнал агентові»
+  sig["count"] = signalCount;
+  if (signalCount) sig["ago"] = (millis() - signalAt) / 1000;
   fillWifi(o["wifi"].to<JsonObject>());
 }
 
@@ -89,6 +94,12 @@ static void fillDebug(JsonObject o) {
   lamp["color"] = hexColor(cfg.lampColor);
   lamp["anim"] = ANIM_NAMES[cfg.lampAnim];
   lamp["off_min"] = cfg.lampOffMin;
+  c["sleep_min"] = cfg.sleepMin;
+  JsonObject fc = c["focus"].to<JsonObject>();
+  fc["work_min"] = cfg.focusWorkMin;
+  fc["break_min"] = cfg.focusBreakMin;
+  fc["quiet"] = (bool)cfg.focusQuiet;
+  c["webhook"] = webhookUrl;
   for (uint8_t m = 0; m < MODE_COUNT; m++) {
     for (uint8_t g = 0; g < G_COUNT; g++)
       c["touch"][MODE_NAMES[m]][GESTURE_NAMES[g]] = ACTION_NAMES[touchAction((Mode)m, (Gesture)g)];
@@ -152,6 +163,11 @@ static void handleConfig() {
     cfg.lampOffMin = constrain(in["lamp"]["off_min"] | (int)cfg.lampOffMin, 0, 1440);
     lightSwitch(true);                  // зміну видно одразу, таймер рахує заново
   }
+  cfg.sleepMin = constrain(in["sleep_min"] | (int)cfg.sleepMin, 1, 240);
+  cfg.focusWorkMin = constrain(in["focus"]["work_min"] | (int)cfg.focusWorkMin, 1, 180);
+  cfg.focusBreakMin = constrain(in["focus"]["break_min"] | (int)cfg.focusBreakMin, 1, 60);
+  cfg.focusQuiet = in["focus"]["quiet"] | (bool)cfg.focusQuiet;
+  if (in["webhook"].is<const char*>()) setWebhook(in["webhook"].as<String>());
   for (uint8_t m = 0; m < MODE_COUNT; m++)
     for (uint8_t g = 0; g < G_COUNT; g++) {
       uint8_t& slot = touchAction((Mode)m, (Gesture)g);
@@ -180,6 +196,11 @@ static void handleAction() {
   else if (action == "on") lightSwitch(true);
   else if (action == "off") lightSwitch(false);
   else if (action == "toggle") lightSwitch(lightOff);
+  else if (indexOf(action.c_str(), ACTION_NAMES, ACT_COUNT, ACT_COUNT) != ACT_COUNT) {   // будь-яка дія сенсора, зі сторінки
+    uint8_t act = indexOf(action.c_str(), ACTION_NAMES, ACT_COUNT, ACT_COUNT);
+    if (!actionFits(act, (Mode)cfg.mode)) return sendError(400, "action does not fit this mode");
+    runAction(act);
+  }
   else if (action == "defaults") { cfg = Settings(); saveSettings(); }
   else return sendError(400, "unknown action");
   handleDebug();

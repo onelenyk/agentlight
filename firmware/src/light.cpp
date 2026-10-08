@@ -9,6 +9,10 @@ static uint32_t rainbowUntil = 0, flashUntil = 0, previewUntil = 0;
 static State    previewState = ST_IDLE;
 bool lightOff = false;
 static uint32_t onAt = 0;       // коли світло ввімкнули: від цього моменту рахує таймер режиму лампи
+static uint32_t sleepAt = 0;    // коли запустили таймер сну; 0 — не запущений
+static int8_t   pickMode = -1;  // режим, колір якого показуємо під час вибору утриманням
+
+const uint32_t FOCUS_WORK = 0xFF2D55, FOCUS_BREAK = 0x00D08A;
 
 const uint8_t FLASH_MIN = 90;   // спалах на дотик видно й на найтьмянішій яскравості
 
@@ -17,6 +21,20 @@ void lightBegin() { strip.begin(); }
 void lightSwitch(bool on) {
   lightOff = !on;
   onAt = millis();
+  sleepAt = 0;                  // будь-яке перемикання світла скасовує таймер сну
+}
+
+void lightPick(int8_t mode) { pickMode = mode; }
+
+void startSleep() {
+  lightOff = false;
+  sleepAt = millis() ? millis() : 1;
+}
+
+uint32_t sleepSecondsLeft() {
+  if (!sleepAt || lightOff) return 0;
+  uint32_t total = cfg.sleepMin * 60UL, passed = (millis() - sleepAt) / 1000;
+  return passed < total ? total - passed : 0;
 }
 
 uint32_t lampSecondsLeft() {
@@ -91,18 +109,48 @@ static void showLook(uint32_t rgb, uint8_t anim, uint32_t t) {
 
 static void showState(State st, uint32_t t) { showLook(cfg.color[st], cfg.anim[st], t); }
 
+// Режим фокусу: діоди — це шкала часу, що лишився. Гаснуть по одному, поточний тьмяніє.
+static void showFocus(uint32_t t, float breathe) {
+  uint32_t rgb = focus.phase == Focus::BREAK ? FOCUS_BREAK : FOCUS_WORK;
+  State agents = aggregate();
+  bool attention = agents >= ST_WAITING && !(cfg.focusQuiet && focus.phase == Focus::WORK);
+  if (attention && (t / 250) % 12 == 0) return fill(cfg.color[agents], 1.0f);      // раз на 3 с: агент чекає
+  if (focus.phase == Focus::IDLE) return fill(rgb, 0.12f + 0.1f * breathe);         // готовий, чекає дотику
+  if (focus.alerting(t)) return fill(rgb, (t / 250) % 2 ? 1.0f : 0.05f);            // відрізок змінився
+  float lit = focus.totalMs ? (float)focus.leftMs / focus.totalMs * cfg.leds : 0;
+  strip.clear();
+  for (uint8_t i = 0; i < cfg.leds; i++) {
+    float k = constrain(lit - i, 0.03f, 1.0f) * (focus.paused ? breathe : 1.0f);
+    strip.setPixelColor(i, (uint8_t)((rgb >> 16 & 255) * k), (uint8_t)((rgb >> 8 & 255) * k), (uint8_t)((rgb & 255) * k));
+  }
+  show();
+}
+
 void render() {
   static uint32_t last = 0;
   if (millis() - last < FRAME_MS) return;
   last = millis();
   float breathe = 0.3f + 0.7f * (0.5f + 0.5f * sinf(last / 1000.0f * PI));  // період 2 с
   if (last < flashUntil) return fill(0xFFFFFF, 1.0f, max(brightness, FLASH_MIN));  // спалах: дотик почуто
+  if (pickMode >= 0) return fill(MODE_COLORS[pickMode], 1.0f, max(brightness, FLASH_MIN));   // вибір режиму утриманням
   if (last < rainbowUntil) return showLook(0, AN_RAINBOW, last);         // тест діодів зі сторінки
   if (last < previewUntil) return showState(previewState, last);         // проба анімації зі сторінки
   if (cfg.mode == MODE_LAMP) {                                           // просто лампа: стан WiFi й агентів не показуємо
     if (!lightOff && cfg.lampOffMin && millis() - onAt > cfg.lampOffMin * 60000UL) lightOff = true;
+    uint8_t wanted = brightness;
+    if (sleepAt && !lightOff) {                                          // таймер сну: яскравість плавно сходить до нуля
+      float left = 1.0f - (float)(millis() - sleepAt) / (cfg.sleepMin * 60000.0f);
+      if (left <= 0) { lightOff = true; sleepAt = 0; }
+      else brightness = max(1, (int)(wanted * left));
+    }
     if (lightOff) return fill(0, 0);
-    return showLook(cfg.lampColor, cfg.lampAnim, last);
+    showLook(cfg.lampColor, cfg.lampAnim, last);
+    brightness = wanted;
+    return;
+  }
+  if (cfg.mode == MODE_FOCUS) {
+    if (lightOff) return fill(0, 0);                                     // таймер іде далі й без світла
+    return showFocus(last, breathe);
   }
   if (portal) return fill(0x003CFF, breathe);                            // синій: режим налаштування
   if (WiFi.status() != WL_CONNECTED) return fill(0x9600FF, breathe);     // фіолетовий: немає WiFi

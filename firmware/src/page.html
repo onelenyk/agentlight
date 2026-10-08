@@ -25,7 +25,8 @@ small{color:var(--mute);display:block;margin-top:8px;font-size:13px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .row>*{flex:1}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
-.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:6px}
+#f_left{font-size:44px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
 .seg button[aria-pressed=true],.on[aria-pressed=true]{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc);font-weight:600}
 table{width:100%;border-collapse:collapse}
 td{padding:4px 6px 4px 0;vertical-align:middle}
@@ -64,7 +65,9 @@ dt{color:var(--mute)}dd{margin:0;overflow-wrap:anywhere}
 <div class="seg" id="modes">
   <button data-mode="agents" onclick="setMode('agents')">Стан агентів</button>
   <button data-mode="lamp" onclick="setMode('lamp')">Лампа</button>
+  <button data-mode="focus" onclick="setMode('focus')">Фокус</button>
 </div>
+<small style="margin:0 0 10px">На самій лампі: тримай сенсор 2 секунди — вона по черзі покаже кольори режимів; відпусти на потрібному.</small>
 
 <div class="card">
   <label for="bright" style="margin-top:0">Яскравість <span id="bval"></span></label>
@@ -106,10 +109,36 @@ dt{color:var(--mute)}dd{margin:0;overflow-wrap:anywhere}
       <option value="240">4 години</option><option value="480">8 годин</option>
     </select>
     <small id="l_left"></small>
+    <label for="sleep_min">Таймер сну: плавно згаснути за, хв</label>
+    <div class="row"><input type="number" id="sleep_min" min="1" max="240" onchange="save({sleep_min:+this.value})">
+      <button onclick="act('sleep')">Запустити</button></div>
+    <small id="s_left"></small>
   </div>
 
   <h2>Дотик у цьому режимі</h2>
   <div class="card" id="t_lamp"></div>
+</section>
+
+<section id="p_focus" hidden>
+  <h2>Таймер</h2>
+  <div class="card">
+    <div id="f_phase" style="color:var(--mute);font-size:14px"></div>
+    <div id="f_left"></div>
+    <div class="row" style="margin-top:10px">
+      <button id="f_toggle" onclick="act('focus_toggle')">Старт</button>
+      <button onclick="act('focus_skip')">Далі</button>
+      <button onclick="act('focus_reset')">Скинути</button>
+    </div>
+    <div class="g2">
+      <div><label for="f_work">Робота, хв</label><input type="number" id="f_work" min="1" max="180" onchange="save({focus:{work_min:+this.value}})"></div>
+      <div><label for="f_break">Перерва, хв</label><input type="number" id="f_break" min="1" max="60" onchange="save({focus:{break_min:+this.value}})"></div>
+    </div>
+    <label style="display:flex;gap:8px;align-items:center;color:var(--fg);font-size:15px"><input type="checkbox" id="f_quiet" style="width:auto" onchange="save({focus:{quiet:this.checked}})"> Під час роботи не показувати, що агент чекає</label>
+    <small>Діоди показують, скільки лишилось: гаснуть по одному. Нова тривалість діє з наступного відрізка. Таймер іде й тоді, коли лампа в іншому режимі.</small>
+  </div>
+
+  <h2>Дотик у цьому режимі</h2>
+  <div class="card" id="t_focus"></div>
 </section>
 
 <details id="d_wifi">
@@ -154,6 +183,9 @@ dt{color:var(--mute)}dd{margin:0;overflow-wrap:anywhere}
     <div><label for="leds">Діодів у лампі</label><input type="number" id="leds" min="1" onchange="save({leds:+this.value})"></div>
     <div><label>Сенсор</label><div id="touchinfo" style="font-size:14px;padding:9px 0"></div></div>
   </div>
+  <label for="webhook">Адреса для дії «запит на адресу»</label>
+  <input type="url" id="webhook" placeholder="http://192.168.1.10:8123/api/webhook/lamp" onchange="save({webhook:this.value})">
+  <small>На цю адресу лампа шле POST із жестом, режимом і станом. Лише http — https лампа не вміє.</small>
   <div class="row" style="margin-top:10px">
     <button onclick="act('rainbow')">Тест діодів</button>
     <button onclick="if(confirm('Скинути вигляд, дотик і таймери до типових?'))act('defaults').then(load)">Типові</button>
@@ -189,12 +221,16 @@ const act=(action,extra)=>post('/api/action',Object.assign({action},extra)).then
 const dur=s=>s<60?s+' с':s<3600?Math.floor(s/60)+' хв':Math.floor(s/3600)+' год '+Math.floor(s%3600/60)+' хв';
 
 const STATES=['busy','waiting','done','error','idle'];
+const MODES=['agents','lamp','focus'];
+const clock=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
 const L={
   state:{busy:'Працює',waiting:'Чекає на тебе',done:'Готово',error:'Помилка',idle:'Спокій'},
   anim:{solid:'рівно',breathe:'дихання',blink:'блимання',spin:'вогник по колу',comet:'комета',wave:'хвиля',heartbeat:'серцебиття',
     sparkle:'іскри',pendulum:'маятник',fill:'наповнення',beacon:'маячок',rainbow:'веселка'},
   act:{none:'нічого',dismiss:'побачив: погасити готово й чекає',brightness:'яскравість по колу',toggle:'увімкнути / вимкнути світло',
-    mode:'перемкнути режим',animation:'наступна анімація',color:'наступний колір'},
+    mode:'наступний режим',animation:'наступна анімація',color:'наступний колір',sleep:'таймер сну',signal:'сигнал агентові',
+    webhook:'запит на адресу',spark:'спалах веселки',focus_toggle:'старт / пауза',focus_skip:'наступний відрізок',focus_reset:'скинути таймер'},
+  phase:{idle:'Не запущений',work:'Робота',break:'Перерва'},
   gesture:{tap:'Дотик',double:'Подвійний дотик',hold:'Утримання'},
   info:{uptime:'Працює',reset:'Причина запуску',chip:'Чип',mac:'MAC',heap:'Вільна пам\'ять',
     heap_min:'Мінімум пам\'яті',led_pin:'Пін діодів',led_max:'Діодів, макс.',touch_pin:'Пін сенсора',ota_ready:'Свій файл прошивки'},
@@ -250,9 +286,10 @@ function build(d){
     c.onchange=()=>look({colors:{[st]:c.value}},st);
     a.onchange=()=>look({anims:{[st]:a.value}},st);
   }
-  for(const k of ['ttl_busy','ttl_done','ttl_attention','leds'])$(k).value=cfg[k];
+  for(const k of ['ttl_busy','ttl_done','ttl_attention','leds','sleep_min','webhook'])$(k).value=cfg[k];
+  $('f_work').value=cfg.focus.work_min;$('f_break').value=cfg.focus.break_min;$('f_quiet').checked=cfg.focus.quiet;
   $('leds').max=d.device.led_max;
-  for(const mode of ['agents','lamp']){
+  for(const mode of MODES){
     const box=$('t_'+mode);box.textContent='';
     for(const g in L.gesture){
       const id='t_'+mode+'_'+g;
@@ -293,12 +330,18 @@ function info(d){
 async function tick(){
   let s;
   try{s=await(await fetch('/api/status')).json();}catch(e){$('state').textContent='немає зв\'язку з лампою';return;}
-  const lamp=s.mode==='lamp';
+  const lamp=s.mode==='lamp',fo=s.focus;
   for(const b of $('modes').children)b.setAttribute('aria-pressed',b.dataset.mode===s.mode);
-  $('p_agents').hidden=lamp;$('p_lamp').hidden=!lamp;
+  for(const m of MODES)$('p_'+m).hidden=m!==s.mode;
+  $('f_phase').textContent=L.phase[fo.phase]+(fo.paused?' · пауза':'')+(fo.cycles?' · завершено відрізків роботи: '+fo.cycles:'');
+  $('f_left').textContent=fo.phase==='idle'?clock((cfg?cfg.focus.work_min:25)*60):clock(fo.left);
+  $('f_toggle').textContent=fo.phase==='idle'?'Старт':fo.paused?'Далі з паузи':'Пауза';
+  $('s_left').textContent=s.sleep_left?'Згасне через '+dur(s.sleep_left)+'.':'';
   $('power').setAttribute('aria-pressed',!s.off);$('power').textContent=s.off?'Увімкнути':'Вимкнути';
-  $('dot').style.background=s.off?'#000':lamp?(cfg?cfg.lamp.color:'#888'):(colors[s.state]||'#333');
-  $('state').textContent=s.off?'світло вимкнене':lamp?'режим лампи':(L.state[s.state]||s.state).toLowerCase();
+  const focusColor=fo.phase==='break'?'#00d08a':'#ff2d55';
+  $('dot').style.background=s.off?'#000':lamp?(cfg?cfg.lamp.color:'#888'):s.mode==='focus'?focusColor:(colors[s.state]||'#333');
+  $('state').textContent=s.off?'світло вимкнене':lamp?'режим лампи':s.mode==='focus'?'фокус: '+L.phase[fo.phase].toLowerCase()+(fo.phase==='idle'?'':', лишилось '+clock(fo.left))
+    :(L.state[s.state]||s.state).toLowerCase();
   if(document.activeElement!==$('bright')){$('bright').value=s.brightness;$('bval').textContent=s.brightness;}
   $('l_left').textContent=s.lamp_left?'Вимкнеться через '+dur(s.lamp_left)+'.':'';
   $('setup').hidden=!s.wifi.portal;
@@ -406,5 +449,5 @@ async function updateNow(){
   }catch(e){saysUpd('Не вдалося завантажити прошивку: '+e.message);updating=false;$('updbtn').disabled=false;}
 }
 $('d_wifi').addEventListener('toggle',()=>{if($('d_wifi').open&&!$('ssid').options.length)scan();});
-load().then(tick);setInterval(tick,2000);
+load().then(tick);setInterval(tick,1000);
 </script></body></html>

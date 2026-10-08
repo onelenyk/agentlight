@@ -5,6 +5,7 @@
   InstallerTests   — hooks/install.sh проти імітації лампи в порожній домашній теці
   EndToEndTests    — встановлений хук, запущений як його запустив би агент, доходить до лампи
   ReleaseTests     — підпис прошивки й файл latest.json, з якого сторінка лампи бере оновлення
+  LogicTests       — жести сенсора й таймер фокусу (tests/logic_test.cpp, той самий код, що в прошивці)
 
 Запуск:  python3 -m unittest discover -s tests -v
 Потрібні: python3, компілятор C++ (c++), curl, openssl; для одного тесту — node.
@@ -14,6 +15,7 @@ import hashlib
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -387,6 +389,29 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn("const UPDATE_URL='https://onelenyk.github.io/agentlight/firmware/'", page)
         workflow = (TESTS.parent / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
         self.assertIn("--out _site/firmware", workflow)
+
+
+class LogicTests(unittest.TestCase):
+    def test_gestures_and_focus_timer(self):
+        out = pathlib.Path(tempfile.mkdtemp(prefix="agentlight-logic-")) / "logic_test"
+        self.addCleanup(shutil.rmtree, out.parent, True)
+        subprocess.run(["c++", "-std=c++17", "-Wall", "-Wextra", "-Werror", "-o", str(out), str(TESTS / "logic_test.cpp")], check=True)
+        result = subprocess.run([str(out)], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stdout)
+
+    def test_page_knows_every_mode_and_action_of_the_firmware(self):
+        settings = (FIRMWARE / "src" / "settings.cpp").read_text(encoding="utf-8")
+        page = (FIRMWARE / "src" / "page.html").read_text(encoding="utf-8")
+        names = lambda array: re.findall(r'"(\w+)"', re.search(array + r"\[\w+\] = \{(.*?)\};", settings, re.S).group(1))
+        for mode in names("MODE_NAMES"):
+            self.assertIn(f'data-mode="{mode}"', page)
+            self.assertIn(f'id="p_{mode}"', page)
+        labels = re.search(r"act:\{(.*?)\}", page, re.S).group(1)
+        for action in names("ACTION_NAMES"):
+            self.assertRegex(labels, rf"\b{action}:'", action)
+        animations = re.search(r"anim:\{(.*?)\}", page, re.S).group(1)
+        for anim in names("ANIM_NAMES"):
+            self.assertRegex(animations, rf"\b{anim}:'", anim)
 
 
 if __name__ == "__main__":

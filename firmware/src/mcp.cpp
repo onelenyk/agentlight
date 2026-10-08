@@ -10,7 +10,7 @@ static const char MCP_TOOLS[] PROGMEM = R"JSON({"tools":[
 "task":{"type":"string","description":"Optional one-line summary of the task you are working on. Kept until you send a new one."},
 "message":{"type":"string","description":"Optional short note about what you are doing right now."}},
 "required":["state"]}},
-{"name":"get_status","description":"Get the current state of the agent status light and the list of agents that reported a status.",
+{"name":"get_status","description":"Get the current state of the agent status light and the list of agents that reported a status. The result also has signal.count, which goes up each time the owner gives the lamp the 'signal the agent' touch, and signal.ago, seconds since the last one: use it when the owner asked you to wait for or react to a tap on the lamp.",
 "inputSchema":{"type":"object","properties":{}}}
 ]})JSON";
 

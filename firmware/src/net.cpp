@@ -62,6 +62,31 @@ void fillWifi(JsonObject w) {
   w["host"] = HOSTNAME ".local";
 }
 
+// Дія сенсора «запит на адресу»: POST із JSON про те, що сталось. Лише http — на TLS у прошивці немає місця.
+void fireWebhook(const char* gesture) {
+  if (portal || !webhookUrl.startsWith("http://")) return;
+  String rest = webhookUrl.substring(7);
+  int slash = rest.indexOf('/');
+  String host = slash < 0 ? rest : rest.substring(0, slash), path = slash < 0 ? "/" : rest.substring(slash);
+  uint16_t port = 80;
+  int colon = host.indexOf(':');
+  if (colon >= 0) { port = host.substring(colon + 1).toInt(); host = host.substring(0, colon); }
+  JsonDocument doc;
+  doc["device"] = apName;
+  doc["gesture"] = gesture;
+  doc["mode"] = MODE_NAMES[cfg.mode];
+  doc["state"] = STATE_NAMES[aggregate()];
+  String body;
+  serializeJson(doc, body);
+  WiFiClient client;
+  if (!client.connect(host.c_str(), port, 1500)) return;
+  client.printf("POST %s HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\nContent-Length: %u\r\nConnection: close\r\n\r\n",
+                path.c_str(), host.c_str(), (unsigned)body.length());
+  client.print(body);
+  client.flush();
+  client.stop();                             // відповідь не читаємо: лампа не має зависати на чужому сервері
+}
+
 static bool tryNet(const char* ssid, const char* pass) {
   Serial.printf("WiFi: підключаюсь до %s\n", ssid);
   WiFi.begin(ssid, pass);

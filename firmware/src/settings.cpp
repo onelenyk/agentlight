@@ -1,25 +1,36 @@
 #include "app.h"
 
 const char* const STATE_NAMES[ST_COUNT] = {"idle", "done", "busy", "waiting", "error"};
-const char* const MODE_NAMES[MODE_COUNT] = {"agents", "lamp"};
+const char* const MODE_NAMES[MODE_COUNT] = {"agents", "lamp", "focus"};
+const uint32_t    MODE_COLORS[MODE_COUNT] = {0xFF5A00, 0xFFB060, 0xFF2D55};   // такими лампа показує режими під час вибору
 const char* const GESTURE_NAMES[G_COUNT] = {"tap", "double", "hold"};
-const char* const ACTION_NAMES[ACT_COUNT] = {"none", "dismiss", "brightness", "toggle", "mode", "animation", "color"};
+const char* const ACTION_NAMES[ACT_COUNT] = {"none", "dismiss", "brightness", "toggle", "mode", "animation", "color",
+                                             "sleep", "signal", "webhook", "spark", "focus_toggle", "focus_skip", "focus_reset"};
 const char* const ANIM_NAMES[AN_COUNT] = {"solid", "breathe", "blink", "spin", "comet", "wave", "heartbeat", "sparkle",
                                           "pendulum", "fill", "beacon", "rainbow"};
 
 Settings    cfg;
 uint8_t     brightness = 60;
 Preferences prefs;
+String      webhookUrl;
 
 bool actionFits(uint8_t action, Mode mode) {
   if (action == ACT_DISMISS) return mode == MODE_AGENTS;
-  if (action == ACT_NEXT_ANIM || action == ACT_NEXT_COLOR) return mode == MODE_LAMP;
+  if (action == ACT_NEXT_ANIM || action == ACT_NEXT_COLOR || action == ACT_SLEEP) return mode == MODE_LAMP;
+  if (action == ACT_FOCUS_TOGGLE || action == ACT_FOCUS_SKIP || action == ACT_FOCUS_RESET) return mode == MODE_FOCUS;
   return action < ACT_COUNT;
 }
 
 uint8_t& touchAction(Mode mode, Gesture gesture) {
   if (mode == MODE_LAMP) return cfg.lampTouch[gesture];
+  if (mode == MODE_FOCUS) return cfg.focusTouch[gesture];
   return gesture == G_TAP ? cfg.tap : gesture == G_DOUBLE ? cfg.dbl : cfg.hold;
+}
+
+void setWebhook(const String& url) {
+  webhookUrl = url;
+  webhookUrl.trim();
+  if (webhookUrl.length()) prefs.putString("webhook", webhookUrl); else prefs.remove("webhook");
 }
 
 void setMode(Mode mode) {
@@ -31,10 +42,12 @@ void setMode(Mode mode) {
 void loadSettings() {
   prefs.begin("agentlight");
   brightness = prefs.getUChar("bright", brightness);
+  if (prefs.isKey("webhook")) webhookUrl = prefs.getString("webhook");
   // Розміри блоку в старих версіях і поле, з якого в них починалось «ще не існує»
   const struct { size_t size, validUntil; } versions[] = {
     {32, offsetof(Settings, anim)},    // до анімацій
     {36, offsetof(Settings, mode)},    // до режимів
+    {48, offsetof(Settings, focusWorkMin)},   // до таймера фокусу
     {sizeof cfg, sizeof cfg},
   };
   size_t stored = prefs.isKey("cfg") ? prefs.getBytesLength("cfg") : 0;

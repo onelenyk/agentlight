@@ -1,10 +1,8 @@
-// Сенсорна кнопка TTP223 на TOUCH_PIN. Три жести — дотик, подвійний дотик, утримання — виконують дії,
-// призначені їм у налаштуваннях окремо для кожного режиму.
+// Сенсорна кнопка TTP223 на TOUCH_PIN. Жести розпізнає gesture.h; тут — що кожен із них робить.
+// Дотик, подвійний дотик і утримання виконують дії з налаштувань, свої в кожному режимі.
+// Довге утримання (2 с) відкриває вибір режиму: лампа по черзі показує кольори режимів, відпустив — вибрав.
 #include "app.h"
-
-const uint16_t DEBOUNCE_MS = 40;
-const uint16_t HOLD_MS = 800;
-const uint16_t DOUBLE_MS = 350;     // другий дотик має початись не пізніше, ніж за стільки після першого
+#include "gesture.h"
 
 // Кольори, які перебирає дія «наступний колір» у режимі лампи
 const uint32_t PALETTE[] = {0xFFB060, 0xFFFFFF, 0xFF2000, 0xFF5A00, 0xFFC800, 0x00FF1E, 0x00D0FF, 0x0040FF, 0x9000FF, 0xFF30A0};
@@ -12,10 +10,13 @@ const uint8_t  PALETTE_SIZE = sizeof PALETTE / sizeof PALETTE[0];
 
 bool     touchRaw = false;
 uint32_t touchCount = 0, touchAt = 0;
+uint32_t signalCount = 0, signalAt = 0;
+static Gestures gestures;
 
 void touchBegin() { pinMode(TOUCH_PIN, INPUT_PULLDOWN); }   // без модуля пін не «плаває» і дотиків не вигадує
 
-static void runAction(uint8_t action) {
+void runAction(uint8_t action, const char* gesture) {
+  uint32_t workMs = cfg.focusWorkMin * 60000UL, breakMs = cfg.focusBreakMin * 60000UL;
   switch (action) {
     case ACT_DISMISS:      // «побачив»: прибирає все, крім агентів, що працюють
       clearAgents(true);
@@ -27,7 +28,7 @@ static void runAction(uint8_t action) {
       lightSwitch(lightOff);
       break;
     case ACT_MODE:
-      setMode(cfg.mode == MODE_AGENTS ? MODE_LAMP : MODE_AGENTS);
+      setMode((Mode)((cfg.mode + 1) % MODE_COUNT));
       break;
     case ACT_NEXT_ANIM:
       cfg.lampAnim = (cfg.lampAnim + 1) % AN_COUNT;
@@ -42,37 +43,55 @@ static void runAction(uint8_t action) {
       lightSwitch(true);
       break;
     }
+    case ACT_SLEEP:
+      startSleep();
+      break;
+    case ACT_SIGNAL:       // агент побачить це в get_status
+      signalCount++;
+      signalAt = millis();
+      flash(250);
+      break;
+    case ACT_WEBHOOK:
+      fireWebhook(gesture);
+      break;
+    case ACT_SPARK:
+      startRainbow(1500);
+      break;
+    case ACT_FOCUS_TOGGLE: focus.toggle(millis(), workMs); break;
+    case ACT_FOCUS_SKIP:   focus.skip(millis(), workMs, breakMs); break;
+    case ACT_FOCUS_RESET:  focus.reset(); break;
   }
 }
 
-static void run(Gesture gesture) { runAction(touchAction((Mode)cfg.mode, gesture)); }
-
 void pollTouch() {
-  static bool     pressed = false, held = false;
-  static uint32_t changedAt = 0, tapAt = 0;   // tapAt: перший дотик чекає, чи не буде другого
+  static int8_t pick = -1;                    // режим, який зараз показує вибір
+  Mode mode = (Mode)cfg.mode;
+  gestures.doubleEnabled = touchAction(mode, G_DOUBLE) != ACT_NONE;   // немає подвійного — дотик не чекає другого
   touchRaw = digitalRead(TOUCH_PIN);          // TTP223: HIGH, поки палець на сенсорі
-  if (touchRaw != pressed && millis() - changedAt > DEBOUNCE_MS) {
-    pressed = touchRaw;
-    if (pressed) {
+  switch (gestures.update(touchRaw, millis())) {
+    case Gestures::PRESS:
       touchCount++;
       touchAt = millis();
       flash();
-    } else if (!held) {
-      if (touchAction((Mode)cfg.mode, G_DOUBLE) == ACT_NONE) run(G_TAP);   // подвійного немає — не чекаємо
-      else if (tapAt) { tapAt = 0; run(G_DOUBLE); }
-      else tapAt = millis();
-    }
-    changedAt = millis();
-    held = false;
-  }
-  if (tapAt && !pressed && millis() - tapAt > DOUBLE_MS) {
-    tapAt = 0;
-    run(G_TAP);
-  }
-  if (pressed && !held && millis() - changedAt > HOLD_MS) {
-    held = true;
-    tapAt = 0;
-    flash();
-    run(G_HOLD);
+      break;
+    case Gestures::HOLD_READY:
+      flash();
+      break;
+    case Gestures::TAP:    runAction(touchAction(mode, G_TAP), "tap"); break;
+    case Gestures::DOUBLE: runAction(touchAction(mode, G_DOUBLE), "double"); break;
+    case Gestures::HOLD:   runAction(touchAction(mode, G_HOLD), "hold"); break;
+    case Gestures::PICK_START:
+      pick = (cfg.mode + 1) % MODE_COUNT;     // перший показаний — наступний за поточним
+      lightPick(pick);
+      break;
+    case Gestures::PICK_STEP:
+      pick = (pick + 1) % MODE_COUNT;
+      lightPick(pick);
+      break;
+    case Gestures::PICK_END:
+      lightPick(-1);
+      setMode((Mode)pick);
+      break;
+    default: break;
   }
 }

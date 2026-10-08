@@ -21,6 +21,7 @@ void loop() {
   pollTouch();
   pollBle();
   pollOta();
+  pollFocus();
   render();
 
   static uint32_t lastLog = 0;
