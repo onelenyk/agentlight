@@ -33,6 +33,7 @@ void fillStatus(JsonObject o) {
   o["lamp_left"] = lampSecondsLeft();
   o["sleep_left"] = sleepSecondsLeft();
   fillFocus(o["focus"].to<JsonObject>());
+  fillGame(o["play"].to<JsonObject>());
   JsonObject sig = o["signal"].to<JsonObject>();     // дія сенсора «сигнал агентові»
   sig["count"] = signalCount;
   if (signalCount) sig["ago"] = (millis() - signalAt) / 1000;
@@ -163,6 +164,11 @@ static void handleConfig() {
     cfg.lampOffMin = constrain(in["lamp"]["off_min"] | (int)cfg.lampOffMin, 0, 1440);
     lightSwitch(true);                  // зміну видно одразу, таймер рахує заново
   }
+  cfg.diceKind = constrain(in["dice"] | (int)cfg.diceKind, 0, Games::DICE_COUNT - 1);
+  if (in["game"].is<int>()) {
+    cfg.gameSel = constrain(in["game"].as<int>(), 0, Games::GAME_COUNT - 1);
+    games.select(cfg.gameSel, millis());
+  }
   cfg.sleepMin = constrain(in["sleep_min"] | (int)cfg.sleepMin, 1, 240);
   cfg.focusWorkMin = constrain(in["focus"]["work_min"] | (int)cfg.focusWorkMin, 1, 180);
   cfg.focusBreakMin = constrain(in["focus"]["break_min"] | (int)cfg.focusBreakMin, 1, 60);
@@ -196,6 +202,8 @@ static void handleAction() {
   else if (action == "on") lightSwitch(true);
   else if (action == "off") lightSwitch(false);
   else if (action == "toggle") lightSwitch(lightOff);
+  else if (action == "game_tap") { games.press(millis()); games.release(millis()); }   // дотик у грі зі сторінки
+  else if (action == "game_records") resetRecords();
   else if (indexOf(action.c_str(), ACTION_NAMES, ACT_COUNT, ACT_COUNT) != ACT_COUNT) {   // будь-яка дія сенсора, зі сторінки
     uint8_t act = indexOf(action.c_str(), ACTION_NAMES, ACT_COUNT, ACT_COUNT);
     if (!actionFits(act, (Mode)cfg.mode)) return sendError(400, "action does not fit this mode");

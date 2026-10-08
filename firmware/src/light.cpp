@@ -148,6 +148,16 @@ void render() {
     brightness = wanted;
     return;
   }
+  if (cfg.mode == MODE_GAMES) {
+    if (lightOff) return fill(0, 0);
+    State agents = aggregate();                                          // між раундами нагадуємо, що агент чекає
+    if (games.idle() && agents >= ST_WAITING && (last / 250) % 12 == 0) return fill(cfg.color[agents], 1.0f);
+    uint32_t frame[LED_COUNT] = {};
+    games.render(last, frame);
+    strip.clear();
+    for (uint8_t i = 0; i < cfg.leds; i++) strip.setPixelColor(i, frame[i]);
+    return show();
+  }
   if (cfg.mode == MODE_FOCUS) {
     if (lightOff) return fill(0, 0);                                     // таймер іде далі й без світла
     return showFocus(last, breathe);

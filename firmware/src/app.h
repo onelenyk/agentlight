@@ -6,14 +6,16 @@
 //   hook     — прийом хуків агентів у їхньому власному форматі
 //   ble      — налаштування WiFi по Bluetooth    ota    — оновлення прошивки по WiFi
 //   timer    — таймер фокусу (логіка в focus.h, жести — у gesture.h: обидва перевіряються тестами на комп'ютері)
+//   play     — ігри (логіка в games.h, теж під тестами)
 #pragma once
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
 #include <WebServer.h>
 #include "focus.h"
+#include "games.h"
 
-#define FW_VERSION "0.8.0"
+#define FW_VERSION "0.9.0"
 #define HOSTNAME   "agentlight"
 
 const uint8_t FRAME_MS = 25;
@@ -28,9 +30,9 @@ const uint8_t MAX_BRIGHTNESS = 255;   // без стелі: корпус на 3 
 enum State : int8_t { ST_IDLE, ST_DONE, ST_BUSY, ST_WAITING, ST_ERROR, ST_COUNT };
 extern const char* const STATE_NAMES[ST_COUNT];
 
-// Режими лампи: показувати стан агентів, просто світити або відлічувати час роботи й перерви.
+// Режими лампи: показувати стан агентів, просто світити, відлічувати час роботи й перерви або грати.
 // Перемикаються зі сторінки або довгим утриманням сенсора: лампа по черзі показує колір кожного режиму.
-enum Mode : uint8_t { MODE_AGENTS, MODE_LAMP, MODE_FOCUS, MODE_COUNT };
+enum Mode : uint8_t { MODE_AGENTS, MODE_LAMP, MODE_FOCUS, MODE_GAMES, MODE_COUNT };
 extern const char* const MODE_NAMES[MODE_COUNT];
 extern const uint32_t    MODE_COLORS[MODE_COUNT];
 
@@ -71,7 +73,11 @@ struct Settings {
   uint16_t sleepMin = 15;             // таймер сну: за стільки хвилин світло плавно згасає
   uint8_t  focusQuiet = 1;            // під час роботи не показувати, що агент чекає
   uint8_t  focusTouch[G_COUNT] = {ACT_FOCUS_TOGGLE, ACT_FOCUS_SKIP, ACT_FOCUS_RESET};
+  uint8_t  gameSel = Games::REACTION; // режим ігор: вибрана гра
+  uint8_t  diceKind = Games::YES_NO;  // що показує кубик
 };
+// Ці два поля лягли в хвіст вирівнювання, тож розмір блоку той самий, що й до ігор; loadSettings() їх перевіряє.
+static_assert(sizeof(Settings) == 60, "розмір Settings змінився: онови таблицю версій у loadSettings()");
 extern String webhookUrl;             // адреса для дії «запит на адресу»; зберігається окремо від блоку налаштувань
 void     setWebhook(const String& url);
 uint8_t& touchAction(Mode mode, Gesture gesture);
@@ -110,6 +116,13 @@ extern uint32_t signalCount, signalAt;          // дія «сигнал аге�
 void touchBegin();
 void pollTouch();
 void runAction(uint8_t action, const char* gesture = "page");
+
+// ---- play ----
+extern Games games;
+void playBegin();
+void pollPlay();
+void fillGame(JsonObject o);
+void resetRecords();
 
 // ---- timer ----
 extern Focus focus;

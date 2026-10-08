@@ -12,6 +12,7 @@ void setup() {
   touchBegin();
   netBegin();
   bleBegin();
+  playBegin();
   apiBegin();
 }
 
@@ -22,6 +23,7 @@ void loop() {
   pollBle();
   pollOta();
   pollFocus();
+  pollPlay();
   render();
 
   static uint32_t lastLog = 0;

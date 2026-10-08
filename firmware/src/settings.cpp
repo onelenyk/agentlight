@@ -1,8 +1,8 @@
 #include "app.h"
 
 const char* const STATE_NAMES[ST_COUNT] = {"idle", "done", "busy", "waiting", "error"};
-const char* const MODE_NAMES[MODE_COUNT] = {"agents", "lamp", "focus"};
-const uint32_t    MODE_COLORS[MODE_COUNT] = {0xFF5A00, 0xFFB060, 0xFF2D55};   // такими лампа показує режими під час вибору
+const char* const MODE_NAMES[MODE_COUNT] = {"agents", "lamp", "focus", "games"};
+const uint32_t    MODE_COLORS[MODE_COUNT] = {0xFF5A00, 0xFFB060, 0xFF2D55, 0x0060FF};   // такими лампа показує режими під час вибору
 const char* const GESTURE_NAMES[G_COUNT] = {"tap", "double", "hold"};
 const char* const ACTION_NAMES[ACT_COUNT] = {"none", "dismiss", "brightness", "toggle", "mode", "animation", "color",
                                              "sleep", "signal", "webhook", "spark", "focus_toggle", "focus_skip", "focus_reset"};
@@ -24,6 +24,7 @@ bool actionFits(uint8_t action, Mode mode) {
 uint8_t& touchAction(Mode mode, Gesture gesture) {
   if (mode == MODE_LAMP) return cfg.lampTouch[gesture];
   if (mode == MODE_FOCUS) return cfg.focusTouch[gesture];
+  if (mode == MODE_GAMES) { static uint8_t fixed; fixed = ACT_NONE; return fixed; }   // в іграх жести зайняті самою грою
   return gesture == G_TAP ? cfg.tap : gesture == G_DOUBLE ? cfg.dbl : cfg.hold;
 }
 
@@ -37,6 +38,7 @@ void setMode(Mode mode) {
   cfg.mode = mode;
   saveSettings();
   lightSwitch(true);
+  if (mode == MODE_GAMES) games.select(cfg.gameSel, millis());
 }
 
 void loadSettings() {
@@ -61,6 +63,8 @@ void loadSettings() {
   for (auto& a : cfg.anim) if (a >= AN_COUNT) a = AN_SOLID;
   if (cfg.lampAnim >= AN_COUNT) cfg.lampAnim = AN_SOLID;
   if (cfg.mode >= MODE_COUNT) cfg.mode = MODE_AGENTS;
+  if (cfg.gameSel >= Games::GAME_COUNT) cfg.gameSel = Games::REACTION;
+  if (cfg.diceKind >= Games::DICE_COUNT) cfg.diceKind = Games::YES_NO;
   for (uint8_t m = 0; m < MODE_COUNT; m++)
     for (uint8_t g = 0; g < G_COUNT; g++)
       if (!actionFits(touchAction((Mode)m, (Gesture)g), (Mode)m)) touchAction((Mode)m, (Gesture)g) = ACT_NONE;

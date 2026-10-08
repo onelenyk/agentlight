@@ -25,7 +25,8 @@ small{color:var(--mute);display:block;margin-top:8px;font-size:13px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .row>*{flex:1}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
-.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:6px}
+.seg{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:6px;margin-bottom:6px}
+#g_stage{font-size:26px;font-weight:600;margin:10px 0 2px}
 #f_left{font-size:44px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1}
 .seg button[aria-pressed=true],.on[aria-pressed=true]{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc);font-weight:600}
 table{width:100%;border-collapse:collapse}
@@ -63,9 +64,10 @@ dt{color:var(--mute)}dd{margin:0;overflow-wrap:anywhere}
 <div id="setup" class="card" hidden>Лампа ще не в мережі. Додай їй WiFi нижче.</div>
 
 <div class="seg" id="modes">
-  <button data-mode="agents" onclick="setMode('agents')">Стан агентів</button>
+  <button data-mode="agents" onclick="setMode('agents')">Агенти</button>
   <button data-mode="lamp" onclick="setMode('lamp')">Лампа</button>
   <button data-mode="focus" onclick="setMode('focus')">Фокус</button>
+  <button data-mode="games" onclick="setMode('games')">Ігри</button>
 </div>
 <small style="margin:0 0 10px">На самій лампі: тримай сенсор 2 секунди — вона по черзі покаже кольори режимів; відпусти на потрібному.</small>
 
@@ -139,6 +141,28 @@ dt{color:var(--mute)}dd{margin:0;overflow-wrap:anywhere}
 
   <h2>Дотик у цьому режимі</h2>
   <div class="card" id="t_focus"></div>
+</section>
+
+<section id="p_games" hidden>
+  <h2>Гра</h2>
+  <div class="card">
+    <div class="seg" id="gamelist" style="grid-template-columns:repeat(3,1fr)"></div>
+    <small id="g_rules" style="margin-top:4px"></small>
+    <div id="g_stage"></div>
+    <div id="g_last" style="color:var(--mute);font-size:14px"></div>
+    <div id="dicebox">
+      <label for="dice">Кубик показує</label>
+      <select id="dice" onchange="save({dice:+this.value})"><option value="0">так чи ні</option><option value="1">число діодами</option><option value="2">випадковий колір</option></select>
+    </div>
+    <div class="row" style="margin-top:10px"><button onclick="act('game_tap')">Дотик зі сторінки</button></div>
+    <small>На лампі: дотик — дія в грі, утримання — наступна гра, утримання 2 секунди — вибір режиму. Для ігор на швидкість торкайся самої лампи: зі сторінки виходить повільніше.</small>
+  </div>
+
+  <h2>Рекорди</h2>
+  <div class="card">
+    <table id="records"></table>
+    <div class="row" style="margin-top:10px"><button onclick="if(confirm('Стерти всі рекорди?'))act('game_records')">Стерти рекорди</button></div>
+  </div>
 </section>
 
 <details id="d_wifi">
@@ -221,7 +245,16 @@ const act=(action,extra)=>post('/api/action',Object.assign({action},extra)).then
 const dur=s=>s<60?s+' с':s<3600?Math.floor(s/60)+' хв':Math.floor(s/3600)+' год '+Math.floor(s%3600/60)+' хв';
 
 const STATES=['busy','waiting','done','error','idle'];
-const MODES=['agents','lamp','focus'];
+const MODES=['agents','lamp','focus','games'];
+const GAMES=[
+  {name:'Реакція',rules:'Червоне — чекай. Щойно стане зеленим, торкнись якнайшвидше. Торкнешся зарано — фальстарт.',fmt:v=>v+' мс'},
+  {name:'Стоп-вогник',rules:'Вогник біжить по колу, один діод позначений тьмяним білим. Зупини вогник саме на ньому; з кожним влучанням він швидший.',fmt:v=>'влучань: '+v},
+  {name:'10 секунд',rules:'Торкнись — лампа згасне. Торкнись ще раз, коли, на твою думку, минуло рівно 10 секунд.',fmt:v=>'помилка '+(v/1000).toFixed(2).replace('.',',')+' с'},
+  {name:'Ритм',rules:'Лампа блимає синім: короткі й довгі спалахи. Повтори їх дотиками — коротко й довго. Щораунду на спалах більше.',fmt:v=>'раундів: '+v},
+  {name:'Марафон',rules:'Скільки разів устигнеш торкнутись за 10 секунд. Відлік починається з першого дотику.',fmt:v=>'дотиків: '+v},
+  {name:'Кубик',rules:'Торкнись — кольори закрутяться й зупиняться на відповіді. Вона світить, доки не торкнешся знову.',fmt:(v,k)=>k===0?(v?'так':'ні'):k===1?'випало '+v:'колір'},
+];
+const STAGE={ready:'Торкнись, щоб почати',wait:'Чекай…',go:'Тисни!',run:'Лови вогник',count:'Іде відлік',play:'Запам\'ятовуй',echo:'Повторюй',spin:'Крутиться…',result:'Результат',fail:'Не вийшло'};
 const clock=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
 const L={
   state:{busy:'Працює',waiting:'Чекає на тебе',done:'Готово',error:'Помилка',idle:'Спокій'},
@@ -287,10 +320,13 @@ function build(d){
     a.onchange=()=>look({anims:{[st]:a.value}},st);
   }
   for(const k of ['ttl_busy','ttl_done','ttl_attention','leds','sleep_min','webhook'])$(k).value=cfg[k];
+  const gl=$('gamelist');gl.textContent='';
+  GAMES.forEach((g,i)=>el('button',{textContent:g.name,onclick:()=>save({game:i}).then(tick)},gl));
   $('f_work').value=cfg.focus.work_min;$('f_break').value=cfg.focus.break_min;$('f_quiet').checked=cfg.focus.quiet;
   $('leds').max=d.device.led_max;
   for(const mode of MODES){
-    const box=$('t_'+mode);box.textContent='';
+    const box=$('t_'+mode);if(!box)continue;
+    box.textContent='';
     for(const g in L.gesture){
       const id='t_'+mode+'_'+g;
       el('label',{htmlFor:id,textContent:L.gesture[g]},box);
@@ -336,11 +372,20 @@ async function tick(){
   $('f_phase').textContent=L.phase[fo.phase]+(fo.paused?' · пауза':'')+(fo.cycles?' · завершено відрізків роботи: '+fo.cycles:'');
   $('f_left').textContent=fo.phase==='idle'?clock((cfg?cfg.focus.work_min:25)*60):clock(fo.left);
   $('f_toggle').textContent=fo.phase==='idle'?'Старт':fo.paused?'Далі з паузи':'Пауза';
+  const pl=s.play,gm=GAMES[pl.game];
+  [...$('gamelist').children].forEach((b,i)=>b.setAttribute('aria-pressed',i===pl.game));
+  $('g_rules').textContent=gm.rules;
+  $('g_stage').textContent=STAGE[pl.stage]||pl.stage;
+  $('g_last').textContent=pl.last[pl.game]||pl.stage==='result'?'Останній результат: '+gm.fmt(pl.last[pl.game],pl.dice):'';
+  $('dicebox').hidden=pl.game!==5;
+  if(document.activeElement!==$('dice'))$('dice').value=pl.dice;
+  const rec=$('records');rec.textContent='';
+  GAMES.slice(0,5).forEach((g,i)=>{const tr=el('tr',{},rec);el('td',{textContent:g.name},tr);el('td',{textContent:pl.best[i]?g.fmt(pl.best[i]):'—'},tr);});
   $('s_left').textContent=s.sleep_left?'Згасне через '+dur(s.sleep_left)+'.':'';
   $('power').setAttribute('aria-pressed',!s.off);$('power').textContent=s.off?'Увімкнути':'Вимкнути';
   const focusColor=fo.phase==='break'?'#00d08a':'#ff2d55';
-  $('dot').style.background=s.off?'#000':lamp?(cfg?cfg.lamp.color:'#888'):s.mode==='focus'?focusColor:(colors[s.state]||'#333');
-  $('state').textContent=s.off?'світло вимкнене':lamp?'режим лампи':s.mode==='focus'?'фокус: '+L.phase[fo.phase].toLowerCase()+(fo.phase==='idle'?'':', лишилось '+clock(fo.left))
+  $('dot').style.background=s.off?'#000':lamp?(cfg?cfg.lamp.color:'#888'):s.mode==='focus'?focusColor:s.mode==='games'?'#0060ff':(colors[s.state]||'#333');
+  $('state').textContent=s.off?'світло вимкнене':lamp?'режим лампи':s.mode==='games'?'гра: '+GAMES[s.play.game].name.toLowerCase():s.mode==='focus'?'фокус: '+L.phase[fo.phase].toLowerCase()+(fo.phase==='idle'?'':', лишилось '+clock(fo.left))
     :(L.state[s.state]||s.state).toLowerCase();
   if(document.activeElement!==$('bright')){$('bright').value=s.brightness;$('bval').textContent=s.brightness;}
   $('l_left').textContent=s.lamp_left?'Вимкнеться через '+dur(s.lamp_left)+'.':'';

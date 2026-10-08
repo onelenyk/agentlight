@@ -1,9 +1,10 @@
-// Тести логіки прошивки, яка не залежить від плати: жести сенсора й таймер фокусу.
+// Тести логіки прошивки, яка не залежить від плати: жести сенсора, таймер фокусу, ігри.
 // Збирається й запускається з tests/test_agentlight.py; при помилці друкує рядок і виходить з кодом 1.
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
 #include "../firmware/src/focus.h"
+#include "../firmware/src/games.h"
 #include "../firmware/src/gesture.h"
 
 static int failures = 0;
@@ -107,9 +108,139 @@ static void focus() {
   CHECK(w.leftMs == WORK - 1000);
 }
 
+// Передбачувана «випадковість»: тест сам задає, що випаде далі
+static std::vector<uint32_t> queue;
+static size_t taken = 0;
+static uint32_t scripted() { return taken < queue.size() ? queue[taken++] : 0; }
+static void script(std::vector<uint32_t> values) { queue = values; taken = 0; }
+static Games fresh(uint8_t game) {
+  Games g;
+  g.rnd = scripted;
+  g.select(game, 1000);
+  return g;
+}
+static void tap(Games& g, uint32_t at, uint32_t held = 100) { g.press(at); g.tick(at); g.release(at + held); g.tick(at + held); }
+
+static void games() {
+  typedef Games Gm;
+  uint32_t leds[3];
+
+  // --- Реакція
+  script({1000});                                   // пауза 2000 + 1000 мс
+  Gm r = fresh(Gm::REACTION);
+  CHECK(r.idle());
+  tap(r, 2000);
+  CHECK(r.stage == Gm::WAIT);
+  r.render(2500, leds); CHECK(leds[0] == 0xFF0000);
+  r.tick(4999); CHECK(r.stage == Gm::WAIT);
+  r.tick(5000); CHECK(r.stage == Gm::GO);
+  r.render(5001, leds); CHECK(leds[2] == 0x00FF1E);
+  r.press(5230);
+  CHECK(r.stage == Gm::RESULT && r.last[Gm::REACTION] == 230 && r.best[Gm::REACTION] == 230 && r.recordChanged);
+  CHECK(r.tier() == 0);
+  r.tick(5230 + Gm::RESULT_MS); CHECK(r.idle());
+  // гірший результат рекорду не міняє
+  r.recordChanged = false;
+  script({0});
+  tap(r, 10000); r.tick(12000); r.press(12600);
+  CHECK(r.last[Gm::REACTION] == 600 && r.best[Gm::REACTION] == 230 && !r.recordChanged && r.tier() == 3);
+  // фальстарт
+  script({3000});
+  r.tick(20000); tap(r, 20000); r.press(21000);
+  CHECK(r.stage == Gm::FAIL && r.best[Gm::REACTION] == 230);
+  r.tick(21000 + Gm::FAIL_MS); CHECK(r.idle());
+  // не торкнувся на зелене
+  script({0});
+  tap(r, 30000); r.tick(32000); CHECK(r.stage == Gm::GO);
+  r.tick(32000 + Gm::GO_TIMEOUT_MS); CHECK(r.stage == Gm::FAIL);
+
+  // --- Стоп-вогник: вогник стартує з діода 0, ціль — діод 2, крок 300 мс
+  script({0, 2, 1});
+  Gm s = fresh(Gm::STOP);
+  s.press(2000);
+  CHECK(s.stage == Gm::RUN && s.runner(2000) == 0 && s.runner(2300) == 1 && s.runner(2650) == 2 && s.runner(2900) == 0);
+  s.press(2650);                                     // влучив; нова ціль — діод 1, вогник далі з діода 0 і швидше
+  CHECK(s.stage == Gm::RUN && s.runner(2650) == 0 && s.runner(2650 + 275) == 1);
+  s.press(2650 + 10);                                // мимо
+  CHECK(s.stage == Gm::RESULT && s.last[Gm::STOP] == 1 && s.best[Gm::STOP] == 1);
+  // перший же дотик мимо — це не результат
+  script({0, 2});
+  Gm s2 = fresh(Gm::STOP);
+  s2.press(2000); s2.press(2010);
+  CHECK(s2.stage == Gm::FAIL && s2.best[Gm::STOP] == 0);
+
+  // --- Десять секунд
+  Gm t = fresh(Gm::TEN);
+  t.press(2000); t.release(2100);
+  t.press(2400); CHECK(t.stage == Gm::COUNT);        // випадковий другий дотик у першу секунду ігнорується
+  t.render(5000, leds); CHECK(leds[0] == 0);          // під час відліку темно
+  t.press(12300);
+  CHECK(t.stage == Gm::RESULT && t.last[Gm::TEN] == 300 && t.tier() == 1);
+  Gm t2 = fresh(Gm::TEN);
+  t2.press(2000); t2.press(11500);
+  CHECK(t2.last[Gm::TEN] == 500);                    // раніше чи пізніше — рахується модуль помилки
+
+  // --- Ритм: короткий, довгий, короткий
+  script({0, 1, 0, 1, 1, 0, 0});
+  Gm h = fresh(Gm::RHYTHM);
+  h.press(2000); h.release(2100);
+  CHECK(h.stage == Gm::PLAY && h.rhythmLength() == 3 && !h.rhythmLong(0) && h.rhythmLong(1) && !h.rhythmLong(2));
+  h.render(2450, leds); CHECK(leds[0] == 0x2060FF);   // іде перший спалах
+  h.render(2650, leds); CHECK(leds[0] == 0);           // пауза між спалахами
+  for (uint32_t now = 2100; now < 6000 && h.stage == Gm::PLAY; now += 10) h.tick(now);
+  CHECK(h.stage == Gm::ECHO);
+  tap(h, 6000, 100); tap(h, 6500, 500); tap(h, 7300, 100);
+  CHECK(h.stage == Gm::PLAY && h.rhythmLength() == 4);  // раунд пройдено, наступний довший
+  for (uint32_t now = 7400; now < 14000 && h.stage == Gm::PLAY; now += 10) h.tick(now);
+  CHECK(h.stage == Gm::ECHO);
+  tap(h, 14000, 100);                                  // а треба було довгий
+  CHECK(h.stage == Gm::RESULT && h.last[Gm::RHYTHM] == 1 && h.best[Gm::RHYTHM] == 1);
+  // мовчання під час повторення — кінець гри
+  script({0, 0, 0});
+  Gm h2 = fresh(Gm::RHYTHM);
+  h2.press(2000); h2.release(2100);
+  for (uint32_t now = 2100; now < 6000 && h2.stage == Gm::PLAY; now += 10) h2.tick(now);
+  for (uint32_t now = 6000; now < 6000 + Gm::ECHO_TIMEOUT_MS + 2000 && h2.stage == Gm::ECHO; now += 10) h2.tick(now);
+  CHECK(h2.stage == Gm::FAIL);
+
+  // --- Марафон
+  Gm m = fresh(Gm::MARATHON);
+  for (int i = 0; i < 60; i++) tap(m, 2000 + i * 150, 50);
+  CHECK(m.stage == Gm::COUNT);
+  m.tick(2000 + Gm::MARATHON_MS);
+  CHECK(m.stage == Gm::RESULT && m.last[Gm::MARATHON] == 60 && m.tier() == 1);
+  m.press(2000 + Gm::MARATHON_MS + 100);              // дотик після кінця починає новий забіг, а не дописується
+  CHECK(m.stage == Gm::COUNT && m.last[Gm::MARATHON] == 60);
+
+  // --- Кубик
+  script({7, 5, 200});
+  Gm d = fresh(Gm::DICE);
+  d.dice = Gm::YES_NO;
+  d.press(2000); CHECK(d.stage == Gm::SPIN);
+  d.press(2100); CHECK(d.stage == Gm::SPIN);          // поки крутиться, дотик нічого не міняє
+  d.tick(2000 + Gm::SPIN_MS);
+  CHECK(d.stage == Gm::RESULT && d.last[Gm::DICE] == 1);
+  d.render(9000, leds); CHECK(leds[0] == 0x00FF1E);
+  d.tick(2000 + Gm::SPIN_MS + 60000); CHECK(d.stage == Gm::RESULT);   // відповідь лишається, доки не торкнешся
+  d.dice = Gm::NUMBER;
+  d.press(70000); d.tick(70000 + Gm::SPIN_MS);
+  CHECK(d.last[Gm::DICE] == 3);                        // 1 + 5 % 3
+  d.render(80000, leds); CHECK(leds[0] == 0xFFFFFF && leds[2] == 0xFFFFFF);
+  CHECK(d.best[Gm::DICE] == 0);
+
+  // --- Зміна гри посеред раунду повертає в початок
+  script({0});
+  Gm c = fresh(Gm::REACTION);
+  tap(c, 2000); CHECK(c.stage == Gm::WAIT);
+  c.select(Gm::TEN, 2500);
+  CHECK(c.idle() && c.game == Gm::TEN);
+  c.select(Gm::GAME_COUNT + 1, 2600); CHECK(c.game == 1);   // номер поза списком не ламає
+}
+
 int main() {
   gestures();
   focus();
+  games();
   if (failures) { printf("%d failed\n", failures); return 1; }
   printf("logic ok\n");
   return 0;

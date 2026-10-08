@@ -1,6 +1,7 @@
 // Сенсорна кнопка TTP223 на TOUCH_PIN. Жести розпізнає gesture.h; тут — що кожен із них робить.
 // Дотик, подвійний дотик і утримання виконують дії з налаштувань, свої в кожному режимі.
 // Довге утримання (2 с) відкриває вибір режиму: лампа по черзі показує кольори режимів, відпустив — вибрав.
+// У режимі ігор дотик іде прямо в гру в момент торкання, а утримання перемикає на наступну гру.
 #include "app.h"
 #include "gesture.h"
 
@@ -66,16 +67,26 @@ void runAction(uint8_t action, const char* gesture) {
 void pollTouch() {
   static int8_t pick = -1;                    // режим, який зараз показує вибір
   Mode mode = (Mode)cfg.mode;
+  static bool inGame = false;                 // цей дотик уже передано грі: її ж треба сповістити про відпускання
+  bool playing = mode == MODE_GAMES;
   gestures.doubleEnabled = touchAction(mode, G_DOUBLE) != ACT_NONE;   // немає подвійного — дотик не чекає другого
   touchRaw = digitalRead(TOUCH_PIN);          // TTP223: HIGH, поки палець на сенсорі
-  switch (gestures.update(touchRaw, millis())) {
+  Gestures::Event event = gestures.update(touchRaw, millis());
+  if (inGame && !gestures.pressed) { inGame = false; games.release(millis()); }
+  switch (event) {
     case Gestures::PRESS:
       touchCount++;
       touchAt = millis();
-      flash();
+      if (playing) { inGame = true; games.press(millis()); }   // без спалаху й без очікування: у грі рахується мить
+      else flash();
       break;
     case Gestures::HOLD_READY:
-      flash();
+      if (playing) {                          // утримання — наступна гра; цей дотик грі вже не належить
+        inGame = false;
+        cfg.gameSel = (cfg.gameSel + 1) % Games::GAME_COUNT;
+        saveSettings();
+        games.select(cfg.gameSel, millis());
+      } else flash();
       break;
     case Gestures::TAP:    runAction(touchAction(mode, G_TAP), "tap"); break;
     case Gestures::DOUBLE: runAction(touchAction(mode, G_DOUBLE), "double"); break;
