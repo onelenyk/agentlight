@@ -4,15 +4,19 @@
   HookFileTests    — файли hooks/*.json: форма, яку приймає кожен агент, і адреси, які розуміє лампа
   InstallerTests   — hooks/install.sh проти імітації лампи в порожній домашній теці
   EndToEndTests    — встановлений хук, запущений як його запустив би агент, доходить до лампи
+  ReleaseTests     — підпис прошивки й файл latest.json, з якого сторінка лампи бере оновлення
 
 Запуск:  python3 -m unittest discover -s tests -v
-Потрібні: python3, компілятор C++ (c++), curl; для одного тесту — node.
+Потрібні: python3, компілятор C++ (c++), curl, openssl; для одного тесту — node.
 """
+import base64
+import hashlib
 import json
 import os
 import pathlib
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
@@ -20,6 +24,9 @@ import unittest
 from mock_lamp import HOOKS, MockLamp, parse_hook
 
 TESTS = pathlib.Path(__file__).resolve().parent
+FIRMWARE = TESTS.parent / "firmware"
+sys.path.insert(0, str(FIRMWARE / "tools"))
+import release  # noqa: E402 — firmware/tools/release.py
 STATES = {"busy", "waiting", "done", "error", "idle", "stop", "notification"}
 # агент у команді встановлювача -> (назва в адресі хука, файл налаштувань у домашній теці)
 AGENTS = {
@@ -317,6 +324,69 @@ class EndToEndTests(unittest.TestCase):
         started = time.time()
         subprocess.run(["sh", "-c", command.replace("agentlight.local", "127.0.0.1:9")], input="{}", text=True, timeout=10, check=True)
         self.assertLess(time.time() - started, 1.0)
+
+
+class ReleaseTests(unittest.TestCase):
+    def setUp(self):
+        self.dir = pathlib.Path(tempfile.mkdtemp(prefix="agentlight-release-"))
+        self.addCleanup(shutil.rmtree, self.dir, True)
+        self.key = self.dir / "key.pem"
+        self.public = self.dir / "public.pem"
+        subprocess.run(["openssl", "ecparam", "-name", "prime256v1", "-genkey", "-noout", "-out", str(self.key)], check=True, capture_output=True)
+        subprocess.run(["openssl", "ec", "-in", str(self.key), "-pubout", "-out", str(self.public)], check=True, capture_output=True)
+        self.version = release.source_version()
+        self.binary = self.dir / "firmware.bin"
+        self.binary.write_bytes(os.urandom(5000) + self.version.encode() + os.urandom(5000))
+
+    def verify(self, file, signature: bytes):
+        sig = self.dir / "sig"
+        sig.write_bytes(signature)
+        return subprocess.run(["openssl", "dgst", "-sha256", "-verify", str(self.public), "-signature", str(sig), str(file)],
+                              capture_output=True).returncode == 0
+
+    def test_manifest_describes_a_correctly_signed_file(self):
+        manifest = release.release(self.binary, self.key, self.dir / "out")
+        published = self.dir / "out" / manifest["file"]
+        self.assertEqual(json.loads((self.dir / "out" / "latest.json").read_text()), manifest)
+        self.assertEqual(manifest["version"], self.version)
+        self.assertEqual(manifest["file"], f"firmware-{self.version}.bin")
+        self.assertEqual(manifest["size"], published.stat().st_size)
+        self.assertEqual(manifest["sha256"], hashlib.sha256(published.read_bytes()).hexdigest())
+        signature = base64.b64decode(manifest["signature"])
+        self.assertLessEqual(len(signature), 80, "лампа відводить під підпис 80 байтів")
+        self.assertTrue(self.verify(published, signature))
+
+    def test_signature_does_not_fit_a_changed_file(self):
+        manifest = release.release(self.binary, self.key, self.dir / "out")
+        changed = self.dir / "changed.bin"
+        data = bytearray(self.binary.read_bytes())
+        data[100] ^= 1
+        changed.write_bytes(data)
+        self.assertFalse(self.verify(changed, base64.b64decode(manifest["signature"])))
+
+    def test_refuses_a_binary_built_from_another_version(self):
+        self.binary.write_bytes(os.urandom(4000))
+        with self.assertRaises(SystemExit):
+            release.release(self.binary, self.key, self.dir / "out")
+
+    def test_embedded_public_key_is_a_p256_key(self):
+        out = subprocess.run(["openssl", "ec", "-pubin", "-in", str(FIRMWARE / "update_public_key.pem"), "-noout", "-text"],
+                             capture_output=True, text=True)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertIn("prime256v1", out.stdout)
+
+    def test_no_private_key_in_the_repository(self):
+        tracked = subprocess.run(["git", "ls-files"], cwd=TESTS.parent, capture_output=True, text=True, check=True).stdout.split("\n")
+        for name in tracked:
+            path = TESTS.parent / name
+            if name and path.is_file() and path.stat().st_size < 200_000 and path.suffix not in (".stl", ".3mf", ".png", ".bin"):
+                self.assertNotIn("PRIVATE KEY-----", path.read_text(encoding="utf-8", errors="ignore").replace('"PRIVATE KEY-----"', ""), name)
+
+    def test_page_and_workflow_agree_on_where_updates_live(self):
+        page = (FIRMWARE / "src" / "page.html").read_text(encoding="utf-8")
+        self.assertIn("const UPDATE_URL='https://onelenyk.github.io/agentlight/firmware/'", page)
+        workflow = (TESTS.parent / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+        self.assertIn("--out _site/firmware", workflow)
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@
 #include <Preferences.h>
 #include <WebServer.h>
 
-#define FW_VERSION "0.6.0"
+#define FW_VERSION "0.7.1"
 #define HOSTNAME   "agentlight"
 
 const uint8_t FRAME_MS = 25;

@@ -1,0 +1,77 @@
+name: Реліз прошивки
+
+# Тег vX.Y.Z збирає прошивку, підписує її і публікує:
+#   - у релізі GitHub (архів усіх версій);
+#   - на GitHub Pages разом із latest.json — звідти її бере кнопка «Встановити» на сторінці лампи.
+# Номер у тезі мусить збігатися з FW_VERSION у firmware/src/app.h.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Тег збігається з версією в коді
+        run: |
+          version=$(sed -n 's/#define FW_VERSION "\(.*\)"/\1/p' firmware/src/app.h)
+          [ "v$version" = "$GITHUB_REF_NAME" ] || { echo "Тег $GITHUB_REF_NAME, а в app.h версія $version"; exit 1; }
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Тести
+        run: python3 -m unittest discover -s tests
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: platformio-${{ hashFiles('firmware/platformio.ini') }}
+      - name: Збірка
+        run: |
+          pip install platformio
+          pio run -d firmware -e c3_supermini
+
+      - name: Підпис
+        env:
+          FIRMWARE_SIGNING_KEY: ${{ secrets.FIRMWARE_SIGNING_KEY }}
+        run: |
+          umask 077
+          printf '%s\n' "$FIRMWARE_SIGNING_KEY" > "$RUNNER_TEMP/key.pem"
+          python3 firmware/tools/release.py --key "$RUNNER_TEMP/key.pem" --out _site/firmware
+          rm "$RUNNER_TEMP/key.pem"
+          # підпис має сходитись із ключем, вшитим у прошивку: інакше лампи відхилять оновлення
+          python3 -c "import json,base64; open('sig','wb').write(base64.b64decode(json.load(open('_site/firmware/latest.json'))['signature']))"
+          openssl dgst -sha256 -verify firmware/update_public_key.pem -signature sig "_site/firmware/firmware-$VERSION.bin"
+
+      - name: Реліз GitHub
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" "_site/firmware/firmware-$VERSION.bin" _site/firmware/latest.json --title "Прошивка $VERSION" --generate-notes
+
+      - name: Сайт
+        run: |
+          mkdir -p _site/case
+          cp index.html _site/
+          cp -r web _site/web
+          cp -r case/preview case/stl _site/case/
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: deploy
+        uses: actions/deploy-pages@v4

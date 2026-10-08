@@ -55,6 +55,10 @@ dt{color:var(--mute)}dd{margin:0;overflow-wrap:anywhere}
   <button id="power" class="on" style="flex:none" onclick="act('toggle')">Світло</button>
 </header>
 
+<div id="updbar" class="card" hidden style="margin-bottom:10px">
+  <div class="row"><span id="updtext"></span><button style="flex:none" onclick="updateNow()">Оновити</button></div>
+</div>
+
 <div id="setup" class="card" hidden>Лампа ще не в мережі. Додай їй WiFi нижче.</div>
 
 <div class="seg" id="modes">
@@ -156,17 +160,24 @@ dt{color:var(--mute)}dd{margin:0;overflow-wrap:anywhere}
     <button onclick="act('reboot')">Перезавантажити</button>
   </div>
 
-  <h2>Оновлення прошивки</h2>
-  <label for="otapass">Пароль оновлення</label>
-  <input type="password" id="otapass" autocomplete="off">
-  <div class="g2">
-    <div><label for="otanew">Новий пароль, від 6 символів</label><input type="password" id="otanew" autocomplete="off"></div>
-    <div><label>&nbsp;</label><button style="width:100%" onclick="setOtaPass()">Задати пароль</button></div>
-  </div>
-  <label for="fwfile">Файл firmware.bin</label>
-  <input type="file" id="fwfile" accept=".bin">
-  <div class="row" style="margin-top:10px"><button id="fwbtn" onclick="uploadFw()">Залити прошивку</button></div>
-  <small id="otamsg"></small>
+  <h2>Прошивка</h2>
+  <div id="fwline"></div>
+  <div class="row" style="margin-top:8px"><button id="updbtn" onclick="updateNow()">Перевірити оновлення</button></div>
+  <small id="updmsg"></small>
+  <details style="background:none;border:0;padding:0">
+    <summary style="font-weight:400;font-size:14px;color:var(--mute)">Залити свій файл прошивки</summary>
+    <small style="margin-top:0">Для власних збірок. Потрібен пароль оновлення; поки він не заданий, цей спосіб вимкнений.</small>
+    <label for="otapass">Пароль оновлення</label>
+    <input type="password" id="otapass" autocomplete="off">
+    <div class="g2">
+      <div><label for="otanew">Новий пароль, від 6 символів</label><input type="password" id="otanew" autocomplete="off"></div>
+      <div><label>&nbsp;</label><button style="width:100%" onclick="setOtaPass()">Задати пароль</button></div>
+    </div>
+    <label for="fwfile">Файл firmware.bin</label>
+    <input type="file" id="fwfile" accept=".bin">
+    <div class="row" style="margin-top:10px"><button id="fwbtn" onclick="uploadFw()">Залити файл</button></div>
+    <small id="otamsg"></small>
+  </details>
 </details>
 
 <script>
@@ -185,8 +196,8 @@ const L={
   act:{none:'нічого',dismiss:'побачив: погасити готово й чекає',brightness:'яскравість по колу',toggle:'увімкнути / вимкнути світло',
     mode:'перемкнути режим',animation:'наступна анімація',color:'наступний колір'},
   gesture:{tap:'Дотик',double:'Подвійний дотик',hold:'Утримання'},
-  info:{version:'Версія',build:'Зібрана',uptime:'Працює',reset:'Причина запуску',chip:'Чип',mac:'MAC',heap:'Вільна пам\'ять',
-    heap_min:'Мінімум пам\'яті',led_pin:'Пін діодів',led_max:'Діодів, макс.',touch_pin:'Пін сенсора',ota_ready:'Оновлення по WiFi'},
+  info:{uptime:'Працює',reset:'Причина запуску',chip:'Чип',mac:'MAC',heap:'Вільна пам\'ять',
+    heap_min:'Мінімум пам\'яті',led_pin:'Пін діодів',led_max:'Діодів, макс.',touch_pin:'Пін сенсора',ota_ready:'Свій файл прошивки'},
 };
 // Як підключити агента: одна команда, яку лампа сама обслуговує. file — що і куди ставиться, для тих, хто хоче вручну
 const TOOLS={
@@ -267,10 +278,13 @@ const setMode=mode=>save({mode}).then(tick);
 const load=()=>fetch('/api/debug').then(r=>r.json()).then(build).catch(()=>{});
 
 function info(d){
+  if(!fwVersion){fwVersion=d.device.version;checkUpdate(true);}
+  $('fwline').textContent='Встановлена версія '+d.device.version+', зібрана '+d.device.build+'.';
   const dl=$('info');dl.textContent='';
   for(const k in d.device){
     let v=d.device[k];
-    if(k==='uptime')v=dur(v);else if(k.startsWith('heap'))v=Math.round(v/1024)+' КБ';else if(k==='ota_ready')v=v?'увімкнене':'вимкнене: задай пароль';
+    if(k==='version'||k==='build')continue;
+    if(k==='uptime')v=dur(v);else if(k.startsWith('heap'))v=Math.round(v/1024)+' КБ';else if(k==='ota_ready')v=v?'дозволено, пароль задано':'вимкнено';
     el('dt',{textContent:L.info[k]||k},dl);el('dd',{textContent:v},dl);
   }
   $('touchinfo').textContent=(d.touch.raw?'палець на сенсорі':'вільний')+' · дотиків: '+d.touch.count;
@@ -339,24 +353,57 @@ async function setOtaPass(){
     if(j.ok){$('otapass').value=$('otanew').value;$('otanew').value='';}
   }catch(e){$('otamsg').textContent='Не вдалося задати пароль.';}
 }
+// Шле лампі файл прошивки з підписом або паролем у заголовку; say показує хід, done(ok) — кінець
+function sendFw(file,header,value,say,done){
+  const body=new FormData();body.append('firmware',file,'firmware.bin');
+  const x=new XMLHttpRequest();
+  x.open('POST','/api/update');
+  x.setRequestHeader(header,value);
+  x.upload.onprogress=e=>{if(e.lengthComputable)say('Заливаю на лампу… '+Math.round(100*e.loaded/e.total)+'%');};
+  x.onload=()=>{
+    let j={};try{j=JSON.parse(x.responseText);}catch(e){}
+    say(j.ok?'Готово. Лампа перезавантажується, сторінка оновиться за 15 с.'
+      :'Не вдалося: '+({'wrong password':'невірний пароль','set update password first':'спершу задай пароль оновлення',
+        'bad signature':'підпис прошивки не пройшов перевірку'}[j.error]||j.error||x.status));
+    if(j.ok)setTimeout(()=>location.reload(),15000);
+    done(j.ok);
+  };
+  x.onerror=()=>{say('З\'єднання з лампою обірвалось.');done(false);};
+  say('Заливаю на лампу…');
+  x.send(body);
+}
 function uploadFw(){
   const f=$('fwfile').files[0];
   if(!f)return void($('otamsg').textContent='Вибери файл firmware.bin.');
-  const body=new FormData();body.append('firmware',f);
-  const x=new XMLHttpRequest();
-  x.open('POST','/api/update');
-  x.setRequestHeader('X-OTA-Password',$('otapass').value);
-  x.upload.onprogress=e=>{if(e.lengthComputable)$('otamsg').textContent='Заливаю… '+Math.round(100*e.loaded/e.total)+'%';};
-  x.onload=()=>{
-    $('fwbtn').disabled=false;
-    let j={};try{j=JSON.parse(x.responseText);}catch(e){}
-    $('otamsg').textContent=j.ok?'Готово. Лампа перезавантажується, сторінка оновиться за 15 с.'
-      :'Не вдалося: '+({'wrong password':'невірний пароль','set update password first':'спершу задай пароль оновлення'}[j.error]||j.error||x.status);
-    if(j.ok)setTimeout(()=>location.reload(),15000);
-  };
-  x.onerror=()=>{$('fwbtn').disabled=false;$('otamsg').textContent='З\'єднання обірвалось.';};
-  $('fwbtn').disabled=true;$('otamsg').textContent='Заливаю…';
-  x.send(body);
+  $('fwbtn').disabled=true;
+  sendFw(f,'X-OTA-Password',$('otapass').value,t=>{$('otamsg').textContent=t;},()=>{$('fwbtn').disabled=false;});
+}
+
+// Офіційні збірки: latest.json каже, яка версія остання, де файл і який у нього підпис. Завантажує браузер,
+// лампі інтернет для цього не потрібен; чужий файл вона не прийме, бо перевіряє підпис.
+const UPDATE_URL='https://onelenyk.github.io/agentlight/firmware/';
+let fwVersion='',latest=null,updating=false;
+const newer=(a,b)=>{const x=a.split('.').map(Number),y=b.split('.').map(Number);for(let i=0;i<3;i++){if((x[i]||0)!==(y[i]||0))return (x[i]||0)>(y[i]||0);}return false;};
+const saysUpd=t=>{$('updmsg').textContent=t;if(!$('updbar').hidden)$('updtext').textContent=t;};
+async function checkUpdate(quiet){
+  try{latest=await(await fetch(UPDATE_URL+'latest.json',{cache:'no-store'})).json();}
+  catch(e){latest=null;if(!quiet)saysUpd('Не вдалося перевірити: браузеру потрібен інтернет.');return;}
+  const has=newer(latest.version,fwVersion);
+  $('updbtn').textContent=has?'Встановити '+latest.version:'Перевірити оновлення';
+  $('updbar').hidden=!has;
+  $('updtext').textContent=has?'Є нова прошивка '+latest.version+' (зараз '+fwVersion+').':'';
+  $('updmsg').textContent=has?'Доступна версія '+latest.version+'.':'Встановлена остання версія.';
+}
+async function updateNow(){
+  if(updating)return;
+  if(!latest||!newer(latest.version,fwVersion))return checkUpdate(false);
+  updating=true;$('updbtn').disabled=true;
+  try{
+    saysUpd('Завантажую прошивку '+latest.version+'…');
+    const blob=await(await fetch(UPDATE_URL+latest.file,{cache:'no-store'})).blob();
+    if(blob.size!==latest.size)throw new Error('файл завантажився не повністю');
+    sendFw(blob,'X-Signature',latest.signature,saysUpd,()=>{updating=false;$('updbtn').disabled=false;});
+  }catch(e){saysUpd('Не вдалося завантажити прошивку: '+e.message);updating=false;$('updbtn').disabled=false;}
 }
 $('d_wifi').addEventListener('toggle',()=>{if($('d_wifi').open&&!$('ssid').options.length)scan();});
 load().then(tick);setInterval(tick,2000);

@@ -3,6 +3,7 @@
   src/page.html          -> сторінка лампи (gzip, 20 КБ -> ~8 КБ)
   ../hooks/*.json, *.js  -> готові хуки агентів, GET /setup/<файл> (gzip)
   ../hooks/install.sh    -> встановлювач, GET /install.sh (без стиснення: лампа дописує до нього свою адресу)
+  update_public_key.pem  -> відкритий ключ, яким лампа перевіряє підпис прошивки при оновленні
 
 Підключено в platformio.ini як extra_scripts; assets.h генерується і в git не потрапляє.
 """
@@ -27,6 +28,9 @@ text += f"const size_t PAGE_GZ_LEN = {len(page)};\n" + array("PAGE_GZ", page) + 
 
 install = (hooks / "install.sh").read_bytes()
 text += f"const size_t INSTALL_SH_LEN = {len(install)};\n" + array("INSTALL_SH", install) + "\n"
+
+key = (src.parent / "update_public_key.pem").read_text().strip()
+text += "\nconst char UPDATE_PUBLIC_KEY[] = \n" + "\n".join(f'  "{line}\\n"' for line in key.splitlines()) + ";\n\n"
 
 entries = []
 for i, f in enumerate(sorted(p for p in hooks.iterdir() if p.suffix in TYPES)):
