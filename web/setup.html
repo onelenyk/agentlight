@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="uk"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AgentLight: WiFi по Bluetooth</title>
+<!-- Налаштування WiFi лампи по Bluetooth. Працює в Chrome на Mac і Android; відкривати через http://localhost або як файл.
+     Протокол описано в src/main.cpp, розділ Bluetooth. -->
+<style>
+body{font:16px system-ui,sans-serif;background:#111;color:#eee;margin:0;padding:16px;max-width:480px;margin:auto}
+h1{font-size:22px}
+h2{font-size:15px;color:#999;margin:24px 0 8px;text-transform:uppercase}
+.card{background:#1c1c1c;border-radius:10px;padding:12px}
+button,select,input{font:inherit;padding:10px;border-radius:8px;border:1px solid #444;background:#222;color:#eee}
+button{cursor:pointer}
+button:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row>*{flex:1}
+label{display:block;margin:8px 0 4px;color:#aaa;font-size:14px}
+input,select{width:100%;box-sizing:border-box}
+small{color:#888;display:block;margin-top:8px}
+dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0}
+dt{color:#888}dd{margin:0;overflow-wrap:anywhere}
+a{color:#ff8a2a}
+.warn{color:#ffb020}
+</style></head><body>
+<h1>AgentLight: WiFi по Bluetooth</h1>
+
+<div class="card" id="nobt" hidden>
+  <span class="warn">Цей браузер не вміє Bluetooth зі сторінок.</span> Відкрий сторінку в Chrome на Mac або Android. На iPhone так не вийде: підключись до точки доступу лампи AgentLight-XXXX.
+</div>
+
+<div id="app" hidden>
+  <div class="row">
+    <button id="connect">Знайти лампу</button>
+  </div>
+  <small id="msg">Лампа має бути ввімкнена й поруч. Chrome покаже список — вибери AgentLight-XXXX.</small>
+
+  <div id="panel" hidden>
+    <h2>Лампа</h2>
+    <div class="card"><dl id="info"></dl></div>
+
+    <h2>Збережені мережі</h2>
+    <div class="card" id="saved"></div>
+
+    <h2>Додати мережу</h2>
+    <div class="card">
+      <label for="ssid">Мережа</label>
+      <div class="row"><select id="ssid"></select><button id="scan" style="flex:0">↻</button></div>
+      <label for="other">або назва вручну (для прихованої мережі)</label>
+      <input id="other" autocomplete="off">
+      <label for="pass">Пароль</label>
+      <input type="password" id="pass" autocomplete="off">
+      <div class="row" style="margin-top:12px"><button id="add">Додати і підключитись</button></div>
+      <small>Лампа пам'ятає до п'яти мереж і сама підключається до тієї, яку бачить поруч.</small>
+    </div>
+  </div>
+</div>
+
+<script>
+const SERVICE='a9e10001-7c1e-4b6f-9d2a-41676e744c69';
+const UUID={status:'a9e10002-7c1e-4b6f-9d2a-41676e744c69',scan:'a9e10003-7c1e-4b6f-9d2a-41676e744c69',cmd:'a9e10004-7c1e-4b6f-9d2a-41676e744c69'};
+const $=id=>document.getElementById(id);
+const enc=new TextEncoder(),dec=new TextDecoder();
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let device=null,chars=null,busy=false,timer=null;
+
+if(!navigator.bluetooth)$('nobt').hidden=false; else $('app').hidden=false;
+const say=t=>{$('msg').textContent=t;};
+
+// Запити до лампи йдуть по одному: Bluetooth не терпить двох операцій одночасно
+async function io(fn){
+  while(busy)await sleep(50);
+  busy=true;
+  try{return await fn();}finally{busy=false;}
+}
+const readJson=name=>io(async()=>JSON.parse(dec.decode(await chars[name].readValue())));
+const send=cmd=>io(()=>chars.cmd.writeValueWithResponse(enc.encode(JSON.stringify(cmd))));
+
+async function open(){
+  const server=await device.gatt.connect();
+  const svc=await server.getPrimaryService(SERVICE);
+  chars={};
+  for(const k in UUID)chars[k]=await svc.getCharacteristic(UUID[k]);
+  $('panel').hidden=false;
+  say('Підключено до '+device.name+'.');
+  await refresh();
+  clearInterval(timer);
+  timer=setInterval(()=>refresh().catch(()=>{}),2000);
+  if(!$('ssid').options.length)scan();
+}
+
+// Після додавання мережі лампа перезавантажується: чекаємо і підключаємось знову без вибору пристрою
+async function reopen(){
+  clearInterval(timer);
+  chars=null;
+  for(let i=0;i<30;i++){
+    say('Лампа перезавантажується, чекаю… '+(i+1));
+    await sleep(2000);
+    try{await open();return;}catch(e){}
+  }
+  say('Лампа не відповідає. Натисни «Знайти лампу» ще раз.');
+}
+
+function row(dl,k,v){
+  const dt=document.createElement('dt');dt.textContent=k;
+  const dd=document.createElement('dd');
+  if(v instanceof Node)dd.appendChild(v); else dd.textContent=v;
+  dl.append(dt,dd);
+}
+
+async function refresh(){
+  if(!chars)return;
+  const s=await readJson('status');
+  const dl=$('info');dl.textContent='';
+  row(dl,'Назва',s.name);
+  if(s.portal){
+    row(dl,'WiFi','не підключена, чекає налаштування');
+  }else{
+    row(dl,'WiFi',s.ssid+' · '+s.rssi+' dBm');
+    const a=document.createElement('a');a.href='http://'+s.ip+'/';a.target='_blank';a.textContent='http://'+s.ip+'/';
+    row(dl,'Сторінка лампи',a);
+  }
+  row(dl,'Стан',s.state);
+  const box=$('saved');box.textContent='';
+  if(!s.saved.length)box.textContent='немає';
+  for(const n of s.saved){
+    const r=document.createElement('div');r.className='row';r.style.marginBottom='6px';
+    const t=document.createElement('span');t.textContent=n+(n===s.ssid?' · підключена':'');
+    const b=document.createElement('button');b.textContent='Забути';b.style.flex='0';
+    b.onclick=async()=>{await send({cmd:'forget',ssid:n});reopen();};
+    r.append(t,b);box.appendChild(r);
+  }
+}
+
+async function scan(){
+  $('scan').disabled=true;
+  try{
+    const before=(await readJson('scan')).seq;
+    await send({cmd:'scan'});
+    let res=null;
+    for(let i=0;i<15&&!res;i++){
+      await sleep(1000);
+      const r=await readJson('scan');
+      if(r.seq!==before)res=r;
+    }
+    const sel=$('ssid');sel.textContent='';
+    for(const n of (res?res.list:[])){const o=document.createElement('option');o.value=o.textContent=n;sel.appendChild(o);}
+    if(!res)say('Лампа не встигла знайти мережі, натисни ↻ ще раз.');
+  }catch(e){say('Помилка пошуку мереж: '+e.message);}
+  $('scan').disabled=false;
+}
+
+$('connect').onclick=async()=>{
+  try{
+    device=await navigator.bluetooth.requestDevice({filters:[{services:[SERVICE]}]});
+    say('Підключаюсь…');
+    await open();
+  }catch(e){
+    if(e.name!=='NotFoundError')say('Не вдалося підключитись: '+e.message);
+  }
+};
+$('scan').onclick=scan;
+$('add').onclick=async()=>{
+  const ssid=$('other').value.trim()||$('ssid').value;
+  if(!ssid)return say('Вибери мережу або введи назву.');
+  try{
+    await send({cmd:'add',ssid,pass:$('pass').value});
+    $('pass').value='';
+    reopen();
+  }catch(e){say('Не вдалося передати мережу: '+e.message);}
+};
+</script></body></html>

@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="uk"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AgentLight</title>
+<style>
+body{font:16px/1.5 system-ui,sans-serif;background:#111;color:#eee;margin:0;padding:24px 16px;max-width:560px;margin:auto}
+h1{font-size:28px;margin:0 0 4px}
+h1 span{color:#ff8a2a}
+p{color:#aaa;margin:0 0 24px}
+a.card{display:block;background:#1c1c1c;border:1px solid #2c2c2c;border-radius:12px;padding:16px;margin-bottom:12px;color:#eee;text-decoration:none}
+a.card:hover,a.card:focus-visible{border-color:#ff8a2a;outline:none}
+a.card b{display:block;font-size:18px;margin-bottom:4px}
+a.card span{color:#999;font-size:14px}
+ul{color:#aaa;padding-left:20px;font-size:14px}
+li{margin-bottom:6px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px}
+</style></head><body>
+<h1>Agent<span>Light</span></h1>
+<p>Лампа на ESP32-C3, яка кольором показує, що зараз робить AI-агент.</p>
+
+<a class="card" href="setup.html"><b>Налаштувати WiFi по Bluetooth</b>
+<span>Знайти лампу поруч, додати їй мережу, подивитись її адресу. Chrome або Edge на Mac, Windows, Android.</span></a>
+
+<a class="card" href="../case/preview/"><b>Корпус у 3D</b>
+<span>Модель, яку можна покрутити й розібрати, схема підключення, файли до друку, складання.</span></a>
+
+<ul>
+  <li><span class="dot" style="background:#ff8000"></span>оранжевий, «дихає» — агент працює</li>
+  <li><span class="dot" style="background:#ff2020"></span>червоний, блимає — агент чекає на тебе</li>
+  <li><span class="dot" style="background:#20d040"></span>зелений — готово</li>
+  <li><span class="dot" style="background:#003cff"></span>синій — лампа чекає налаштування WiFi</li>
+  <li><span class="dot" style="background:#9600ff"></span>фіолетовий — немає WiFi</li>
+</ul>
+</body></html>

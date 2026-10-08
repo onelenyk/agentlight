@@ -1,0 +1,105 @@
+{
+  "hooks": {
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/agentlight.sh\" idle",
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/agentlight.sh\" busy",
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/agentlight.sh\" done",
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/agentlight.sh\" busy",
+            "async": true,
+            "timeout": 5
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/agentlight.sh\" busy",
+            "async": true,
+            "timeout": 5
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/agentlight.sh\" waiting",
+            "async": true,
+            "timeout": 5
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/agentlight.sh\" waiting",
+            "async": true,
+            "timeout": 5
+          }
+        ],
+        "matcher": "AskUserQuestion"
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/agentlight.sh\" waiting",
+            "async": true,
+            "timeout": 5
+          }
+        ],
+        "matcher": "permission_prompt|elicitation_dialog"
+      }
+    ]
+  }
+}

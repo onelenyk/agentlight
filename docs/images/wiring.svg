@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 780 440" width="1560" height="880" role="img" aria-label="Схема: 5V і GND плати йдуть на всі три платки діодів, GPIO4 через резистор 330 Ом на DIN першої, далі DOUT кожної на DIN наступної. Сенсор TTP223: VCC від 3V3, GND від GND, вихід I/O на GPIO1">
+<style>
+text{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}
+.wire{fill:none;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.w-5v{stroke:#e5484d}.w-data{stroke:#2fa858}.w-gnd{stroke:#151a22}.w-3v3{stroke:#e0a100}.w-sig{stroke:#3b82f6}
+.f-5v{fill:#e5484d}.f-data{fill:#2fa858}.f-gnd{fill:#151a22}.f-sig{fill:#3b82f6}
+.pcb{fill:#e9ecf0;stroke:#5d6877;stroke-width:1.5}
+.pad{fill:#f6f7f9;stroke:#5d6877;stroke-width:1.5}
+.pad.used{stroke:#151a22;stroke-width:2}
+.t{fill:#5d6877;font-size:11px}
+.t.on{fill:#151a22;font-weight:500}
+.t.big{font-size:13px}
+</style>
+<rect width="780" height="440" fill="#f6f7f9"/>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" class="f-data"/></marker><marker id="arr2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" class="f-sig"/></marker></defs>
+<rect class="pcb" x="600" y="34" width="140" height="266" rx="8"/>
+<rect class="pad" x="645" y="20" width="50" height="34" rx="6"/><text class="t" x="670" y="41" text-anchor="middle">USB-C</text>
+<text class="t" x="670" y="318" text-anchor="middle">Super Mini, вид зверху</text>
+<circle class="pad used" cx="612" cy="80" r="5.5"/><text class="t on" x="623" y="84">5V</text>
+<circle class="pad used" cx="612" cy="108" r="5.5"/><text class="t on" x="623" y="112">GND</text>
+<circle class="pad used" cx="612" cy="136" r="5.5"/><text class="t on" x="623" y="140">3V3</text>
+<circle class="pad used" cx="612" cy="164" r="5.5"/><text class="t on" x="623" y="168">GPIO4</text>
+<circle class="pad" cx="612" cy="192" r="5.5"/><text class="t" x="623" y="196">GPIO3</text>
+<circle class="pad" cx="612" cy="220" r="5.5"/><text class="t" x="623" y="224">GPIO2</text>
+<circle class="pad used" cx="612" cy="248" r="5.5"/><text class="t on" x="623" y="252">GPIO1</text>
+<circle class="pad" cx="612" cy="276" r="5.5"/><text class="t" x="623" y="280">GPIO0</text>
+<circle class="pad" cx="728" cy="80" r="5.5"/><text class="t" x="717" y="84" text-anchor="end">GPIO5</text>
+<circle class="pad" cx="728" cy="108" r="5.5"/><text class="t" x="717" y="112" text-anchor="end">GPIO6</text>
+<circle class="pad" cx="728" cy="136" r="5.5"/><text class="t" x="717" y="140" text-anchor="end">GPIO7</text>
+<circle class="pad" cx="728" cy="164" r="5.5"/><text class="t" x="717" y="168" text-anchor="end">GPIO8</text>
+<circle class="pad" cx="728" cy="192" r="5.5"/><text class="t" x="717" y="196" text-anchor="end">GPIO9</text>
+<circle class="pad" cx="728" cy="220" r="5.5"/><text class="t" x="717" y="224" text-anchor="end">GPIO10</text>
+<circle class="pad" cx="728" cy="248" r="5.5"/><text class="t" x="717" y="252" text-anchor="end">GPIO20</text>
+<circle class="pad" cx="728" cy="276" r="5.5"/><text class="t" x="717" y="280" text-anchor="end">GPIO21</text>
+<path class="wire w-5v" d="M612 80 H130 V138"/><path class="wire w-5v" d="M440 80 V138"/><path class="wire w-5v" d="M285 80 V138"/>
+<circle class="f-5v" cx="440" cy="80" r="4"/><circle class="f-5v" cx="285" cy="80" r="4"/>
+<text class="t on" x="350" y="70" text-anchor="middle">5V · червоний</text>
+<path class="wire w-gnd" d="M612 108 H556 V157 a7 7 0 0 0 0 14 V262 H130 V190"/><path class="wire w-gnd" d="M440 262 V190"/><path class="wire w-gnd" d="M285 262 V190"/>
+<path class="wire w-gnd" d="M520 262 V340 H464"/>
+<circle class="f-gnd" cx="440" cy="262" r="4"/><circle class="f-gnd" cx="285" cy="262" r="4"/><circle class="f-gnd" cx="520" cy="262" r="4"/>
+<text class="t on" x="350" y="282" text-anchor="middle">GND · чорний</text>
+<path class="wire w-data" d="M612 164 H536"/><path class="wire w-data" d="M492 164 H470" marker-end="url(#arr)"/>
+<rect class="pad used" x="492" y="155" width="44" height="18" rx="4"/><text class="t on" x="514" y="146" text-anchor="middle">330 Ом</text>
+<path class="wire w-data" d="M414 164 H315" marker-end="url(#arr)"/><path class="wire w-data" d="M259 164 H160" marker-end="url(#arr)"/>
+<text class="t on" x="364" y="146" text-anchor="middle">дані · зелений</text>
+<path class="wire w-data" d="M104 164 H78" stroke-dasharray="3 5"/><text class="t" x="72" y="168" text-anchor="end">вільний</text>
+<circle class="pcb" cx="440" cy="164" r="34"/><rect class="pad" x="429" y="153" width="22" height="22" rx="3"/><text class="t on big" x="440" y="169" text-anchor="middle">1</text><circle class="pad used" cx="440" cy="138" r="4.5"/><circle class="pad used" cx="440" cy="190" r="4.5"/><circle class="pad used" cx="466" cy="164" r="4.5"/><circle class="pad used" cx="414" cy="164" r="4.5"/><text class="t" x="478" y="180">DIN</text><text class="t" x="402" y="180" text-anchor="end">DOUT</text>
+<circle class="pcb" cx="285" cy="164" r="34"/><rect class="pad" x="274" y="153" width="22" height="22" rx="3"/><text class="t on big" x="285" y="169" text-anchor="middle">2</text><circle class="pad used" cx="285" cy="138" r="4.5"/><circle class="pad used" cx="285" cy="190" r="4.5"/><circle class="pad used" cx="311" cy="164" r="4.5"/><circle class="pad used" cx="259" cy="164" r="4.5"/><text class="t" x="323" y="180">DIN</text><text class="t" x="247" y="180" text-anchor="end">DOUT</text>
+<circle class="pcb" cx="130" cy="164" r="34"/><rect class="pad" x="119" y="153" width="22" height="22" rx="3"/><text class="t on big" x="130" y="169" text-anchor="middle">3</text><circle class="pad used" cx="130" cy="138" r="4.5"/><circle class="pad used" cx="130" cy="190" r="4.5"/><circle class="pad used" cx="156" cy="164" r="4.5"/><circle class="pad used" cx="104" cy="164" r="4.5"/><text class="t" x="168" y="180">DIN</text><text class="t" x="92" y="180" text-anchor="end">DOUT</text>
+<path class="wire w-3v3" d="M612 136 H574 V157 a7 7 0 0 0 0 14 V360 H464"/>
+<path class="wire w-sig" d="M464 380 H592 V248 H606"/>
+<rect class="pcb" x="330" y="318" width="140" height="84" rx="6"/>
+<circle class="pad" cx="378" cy="360" r="30"/><text class="t on" x="378" y="357" text-anchor="middle">TTP223</text><text class="t" x="378" y="372" text-anchor="middle">дотик</text>
+<circle class="pad used" cx="458" cy="340" r="4.5"/><text class="t on" x="448" y="344" text-anchor="end">GND</text>
+<circle class="pad used" cx="458" cy="360" r="4.5"/><text class="t on" x="448" y="364" text-anchor="end">VCC</text>
+<circle class="pad used" cx="458" cy="380" r="4.5"/><text class="t on" x="448" y="384" text-anchor="end">I/O</text>
+<text class="t" x="400" y="420" text-anchor="middle">сенсор, у стелі розсіювача</text>
+<text class="t on" x="530" y="353" text-anchor="middle">3V3 · жовтий</text>
+<text class="t on" x="530" y="398" text-anchor="middle">сигнал · синій</text>
+<text class="t" x="180" y="304" text-anchor="middle">платки діодів, у кишенях диска</text>
+</svg>
