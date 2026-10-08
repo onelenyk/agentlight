@@ -57,6 +57,7 @@ static void fillDebug(JsonObject o) {
   d["led_pin"] = LED_PIN;
   d["led_max"] = LED_COUNT;
   d["touch_pin"] = TOUCH_PIN;
+  d["ota_ready"] = otaReady();
   JsonObject t = o["touch"].to<JsonObject>();
   t["raw"] = touchRaw;
   t["count"] = touchCount;
@@ -192,5 +193,6 @@ void apiBegin() {
     server.sendHeader("Location", "http://" + WiFi.softAPIP().toString() + "/");   // портал: будь-яка адреса веде на сторінку
     server.send(302, "text/plain", "");
   });
+  otaBegin();
   server.begin();
 }

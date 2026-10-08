@@ -114,6 +114,22 @@ input[type=color]{padding:2px;height:42px}
   <small id="cfgmsg"></small>
 </div>
 
+<h2>Оновлення прошивки</h2>
+<div class="card">
+  <div id="fwinfo"></div>
+  <label for="otapass">Пароль оновлення</label>
+  <input type="password" id="otapass" autocomplete="off">
+  <div id="otaset">
+    <label for="otanew">Новий пароль (від 6 символів)</label>
+    <input type="password" id="otanew" autocomplete="off">
+    <div class="row" style="margin-top:8px"><button onclick="setOtaPass()">Задати пароль</button></div>
+  </div>
+  <label for="fwfile">Файл firmware.bin</label>
+  <input type="file" id="fwfile" accept=".bin">
+  <div class="row" style="margin-top:12px"><button id="fwbtn" onclick="uploadFw()">Залити прошивку</button></div>
+  <small id="otamsg"></small>
+</div>
+
 <h2>Дії</h2>
 <div class="row">
   <button onclick="act('rainbow')">Веселка 10 с</button>
@@ -185,7 +201,7 @@ function saveWifi(){
 }
 function resetWifi(ssid){post('/api/wifi/reset',ssid?{ssid}:{});$('msg').textContent=(ssid?'Мережу «'+ssid+'» забуто':'Усі мережі забуто')+', девайс перезавантажується.';}
 const actLabels={none:'нічого',dismiss:'побачив: гасить готово і чекає',brightness:'яскравість по колу',mute:'вимкнути / увімкнути світло'};
-const infoLabels={uptime:'Працює',reset:'Причина запуску',build:'Прошивка зібрана',chip:'Чип',mac:'MAC',heap:'Вільна пам\'ять',heap_min:'Мінімум пам\'яті',led_pin:'Пін діодів',led_max:'Діодів, макс.',touch_pin:'Пін сенсора'};
+const infoLabels={version:'Версія',ota_ready:'Оновлення по WiFi',uptime:'Працює',reset:'Причина запуску',build:'Прошивка зібрана',chip:'Чип',mac:'MAC',heap:'Вільна пам\'ять',heap_min:'Мінімум пам\'яті',led_pin:'Пін діодів',led_max:'Діодів, макс.',touch_pin:'Пін сенсора'};
 let cfgLoaded=false;
 function fillCfg(d){
   const c=d.settings;
@@ -207,13 +223,15 @@ async function refreshDebug(){
     const row=(k,v)=>{const dt=document.createElement('dt');dt.textContent=k;const dd=document.createElement('dd');dd.textContent=v;dl.append(dt,dd);};
     for(const k in d.device){
       let v=d.device[k];
-      if(k==='uptime')v=dur(v); else if(k.startsWith('heap'))v=Math.round(v/1024)+' КБ';
+      if(k==='uptime')v=dur(v); else if(k.startsWith('heap'))v=Math.round(v/1024)+' КБ'; else if(k==='ota_ready')v=v?'увімкнене':'вимкнене: задай пароль';
       row(infoLabels[k]||k,v);
     }
     row('WiFi',d.wifi.portal?'точка доступу '+d.wifi.ap:d.wifi.ssid+' · '+d.wifi.rssi+' dBm');
     row('Світло',d.muted?'вимкнене дотиком':'увімкнене');
     $('touchdot').style.background=d.touch.raw?'#20d040':'#333';
     $('touchinfo').textContent=(d.touch.raw?'палець на сенсорі':'не торкаються')+' · дотиків: '+d.touch.count+(d.touch.count?' · останній '+dur(d.touch.ago)+' тому':'');
+    $('fwinfo').textContent='Зараз: версія '+d.device.version+', зібрана '+d.device.build;
+    $('otapass').placeholder=d.device.ota_ready?'':'ще не заданий — залиш порожнім';
     if(!cfgLoaded)fillCfg(d);
   }catch(e){}
 }
@@ -227,6 +245,33 @@ async function saveCfg(){
 async function act(action){
   try{const r=await post('/api/action',{action});if(action==='defaults')fillCfg(await r.json());}catch(e){}
   refresh();
+}
+async function setOtaPass(){
+  try{
+    const r=await post('/api/ota/password',{old:$('otapass').value,new:$('otanew').value});
+    const j=await r.json();
+    $('otamsg').textContent=j.ok?'Пароль задано.':({'wrong password':'Невірний поточний пароль.','password too short':'Пароль закороткий.'}[j.error]||j.error);
+    if(j.ok){$('otapass').value=$('otanew').value;$('otanew').value='';}
+  }catch(e){$('otamsg').textContent='Не вдалося задати пароль.';}
+}
+function uploadFw(){
+  const f=$('fwfile').files[0];
+  if(!f)return void($('otamsg').textContent='Вибери файл firmware.bin.');
+  const body=new FormData();body.append('firmware',f);
+  const x=new XMLHttpRequest();
+  x.open('POST','/api/update');
+  x.setRequestHeader('X-OTA-Password',$('otapass').value);
+  x.upload.onprogress=e=>{if(e.lengthComputable)$('otamsg').textContent='Заливаю… '+Math.round(100*e.loaded/e.total)+'%';};
+  x.onload=()=>{
+    $('fwbtn').disabled=false;
+    let j={};try{j=JSON.parse(x.responseText);}catch(e){}
+    $('otamsg').textContent=j.ok?'Готово. Лампа перезавантажується, сторінка оновиться за 15 с.'
+      :'Не вдалося: '+({'wrong password':'невірний пароль','set update password first':'спершу задай пароль оновлення'}[j.error]||j.error||x.status);
+    if(j.ok)setTimeout(()=>location.reload(),15000);
+  };
+  x.onerror=()=>{$('fwbtn').disabled=false;$('otamsg').textContent='З\'єднання обірвалось.';};
+  $('fwbtn').disabled=true;$('otamsg').textContent='Заливаю…';
+  x.send(body);
 }
 $('debug').addEventListener('toggle',refreshDebug);
 refresh();setInterval(refresh,2000);setInterval(refreshDebug,500);scan();

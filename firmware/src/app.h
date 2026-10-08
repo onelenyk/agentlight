@@ -3,14 +3,14 @@
 //   light    — діоди й анімації            touch  — сенсор TTP223
 //   net      — WiFi: збережені мережі, точка доступу з порталом
 //   api      — веб-сервер, сторінка, REST  mcp    — MCP-сервер
-//   ble      — налаштування WiFi по Bluetooth
+//   ble      — налаштування WiFi по Bluetooth    ota    — оновлення прошивки по WiFi
 #pragma once
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <Preferences.h>
 #include <WebServer.h>
 
-#define FW_VERSION "0.2.0"
+#define FW_VERSION "0.3.0"
 #define HOSTNAME   "agentlight"
 
 const uint8_t FRAME_MS = 25;
@@ -54,6 +54,7 @@ void lightBegin();
 void render();
 void startRainbow(uint32_t ms);
 void flash(uint16_t ms = 80);
+void lightSolid(uint32_t rgb);                  // одразу, поза render(): під час оновлення loop() стоїть
 
 // ---- touch ----
 extern bool     touchRaw;
@@ -84,3 +85,8 @@ void handleMcp();
 // ---- ble ----
 void bleBegin();
 void pollBle();
+
+// ---- ota ----
+bool otaReady();                                // пароль оновлення задано
+void otaBegin();                                // після apiBegin(): додає свої маршрути до сервера
+void pollOta();

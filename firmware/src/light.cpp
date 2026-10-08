@@ -22,6 +22,8 @@ static void fill(uint32_t rgb, float k) {
   show();
 }
 
+void lightSolid(uint32_t rgb) { fill(rgb, 0.5f); }
+
 void render() {
   static uint32_t last = 0;
   if (millis() - last < FRAME_MS) return;

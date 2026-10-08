@@ -20,6 +20,7 @@ void loop() {
   server.handleClient();
   pollTouch();
   pollBle();
+  pollOta();
   render();
 
   static uint32_t lastLog = 0;
