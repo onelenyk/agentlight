@@ -10,7 +10,7 @@
 #include <Preferences.h>
 #include <WebServer.h>
 
-#define FW_VERSION "0.4.0"
+#define FW_VERSION "0.5.0"
 #define HOSTNAME   "agentlight"
 
 const uint8_t FRAME_MS = 25;
@@ -25,27 +25,43 @@ const uint8_t MAX_BRIGHTNESS = 255;   // без стелі: корпус на 3 
 enum State : int8_t { ST_IDLE, ST_DONE, ST_BUSY, ST_WAITING, ST_ERROR, ST_COUNT };
 extern const char* const STATE_NAMES[ST_COUNT];
 
-// Що робить дотик до сенсора
-enum Action : uint8_t { ACT_NONE, ACT_DISMISS, ACT_BRIGHT, ACT_MUTE, ACT_COUNT };
+// Режими лампи: показувати стан агентів або просто світити
+enum Mode : uint8_t { MODE_AGENTS, MODE_LAMP, MODE_COUNT };
+extern const char* const MODE_NAMES[MODE_COUNT];
+
+// Жести сенсора і дії, які на них можна призначити (окремо в кожному режимі)
+enum Gesture : uint8_t { G_TAP, G_DOUBLE, G_HOLD, G_COUNT };
+extern const char* const GESTURE_NAMES[G_COUNT];
+enum Action : uint8_t { ACT_NONE, ACT_DISMISS, ACT_BRIGHT, ACT_TOGGLE, ACT_MODE, ACT_NEXT_ANIM, ACT_NEXT_COLOR, ACT_COUNT };
 extern const char* const ACTION_NAMES[ACT_COUNT];
+bool actionFits(uint8_t action, Mode mode);     // чи має дія сенс у цьому режимі
 
 // Анімації діодів; кожному стану в налаштуваннях призначена своя
 enum Anim : uint8_t { AN_SOLID, AN_BREATHE, AN_BLINK, AN_SPIN, AN_COMET, AN_WAVE, AN_HEARTBEAT, AN_SPARKLE,
-                      AN_PENDULUM, AN_FILL, AN_BEACON, AN_COUNT };
+                      AN_PENDULUM, AN_FILL, AN_BEACON, AN_RAINBOW, AN_COUNT };   // rainbow ігнорує колір
 extern const char* const ANIM_NAMES[AN_COUNT];
 
 // ---- settings ----
-// Налаштування з дебаг-меню; зберігаються одним блоком, тож зміна складу структури скидає їх до типових
+// Налаштування зі сторінки лампи; зберігаються одним блоком. Нові поля додаються лише в кінець:
+// loadSettings() читає й коротші блоки старих версій, а решту лишає типовою.
 struct Settings {
   uint8_t  leds = 3;                  // скільки діодів світити (у корпусі три); не більше LED_COUNT
   uint16_t ttlBusyMin = 10;           // busy без оновлень: агент, мабуть, завис або вбитий; 0 — не гасне
   uint16_t ttlDoneMin = 5;            // зелений гасне сам
   uint16_t ttlAttentionMin = 120;     // waiting / error
   uint32_t color[ST_COUNT] = {0x000000, 0x00FF1E, 0xFF5A00, 0xFF0000, 0xFF0000};  // у порядку State
-  uint8_t  tap = ACT_DISMISS;         // короткий дотик
-  uint8_t  hold = ACT_BRIGHT;         // утримання
+  uint8_t  tap = ACT_DISMISS;         // режим агентів: короткий дотик
+  uint8_t  hold = ACT_BRIGHT;         // режим агентів: утримання
   uint8_t  anim[ST_COUNT] = {AN_SOLID, AN_SOLID, AN_BREATHE, AN_BLINK, AN_SOLID};  // у порядку State
+  uint8_t  mode = MODE_AGENTS;
+  uint8_t  dbl = ACT_MODE;            // режим агентів: подвійний дотик
+  uint8_t  lampTouch[G_COUNT] = {ACT_TOGGLE, ACT_MODE, ACT_BRIGHT};   // режим лампи: дотик, подвійний, утримання
+  uint8_t  lampAnim = AN_SOLID;
+  uint16_t lampOffMin = 0;            // режим лампи: вимкнутись через стільки хвилин; 0 — світити завжди
+  uint32_t lampColor = 0xFFB060;      // теплий білий
 };
+uint8_t& touchAction(Mode mode, Gesture gesture);
+void     setMode(Mode mode);
 extern Settings    cfg;
 extern uint8_t     brightness;
 extern Preferences prefs;
@@ -60,8 +76,10 @@ void        fillAgents(JsonArray list);
 void        clearAgents(bool keepBusy);
 
 // ---- light ----
-extern bool muted;                              // світло вимкнене дотиком; агенти рахуються далі
+extern bool lightOff;                           // світло вимкнене дотиком або таймером; агенти рахуються далі
 void lightBegin();
+void lightSwitch(bool on);                      // вмикає (і заново запускає таймер режиму лампи) або вимикає
+uint32_t lampSecondsLeft();                     // скільки лишилось до автовимкнення; 0 — таймера немає
 void render();
 void startRainbow(uint32_t ms);
 void startPreview(State st, uint32_t ms);        // показати вигляд стану незалежно від агентів

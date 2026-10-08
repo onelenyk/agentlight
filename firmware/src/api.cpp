@@ -27,7 +27,9 @@ void fillStatus(JsonObject o) {
   o["state"] = STATE_NAMES[aggregate()];
   fillAgents(o["agents"].to<JsonArray>());
   o["brightness"] = brightness;
-  o["muted"] = muted;
+  o["mode"] = MODE_NAMES[cfg.mode];
+  o["off"] = lightOff;
+  o["lamp_left"] = lampSecondsLeft();
   fillWifi(o["wifi"].to<JsonObject>());
 }
 
@@ -42,6 +44,18 @@ static const char* resetReason() {
     case ESP_RST_BROWNOUT: return "просідання живлення";
     default:               return "інше";
   }
+}
+
+static String hexColor(uint32_t c) {
+  char hex[8];
+  snprintf(hex, sizeof hex, "#%06x", (unsigned)(c & 0xFFFFFF));
+  return hex;
+}
+
+static bool parseColor(const char* hex, uint32_t& out) {
+  if (strlen(hex) != 7 || hex[0] != '#') return false;
+  out = strtoul(hex + 1, nullptr, 16);
+  return true;
 }
 
 static void fillDebug(JsonObject o) {
@@ -68,16 +82,18 @@ static void fillDebug(JsonObject o) {
   c["ttl_busy"] = cfg.ttlBusyMin;
   c["ttl_done"] = cfg.ttlDoneMin;
   c["ttl_attention"] = cfg.ttlAttentionMin;
-  for (int8_t i = ST_IDLE; i < ST_COUNT; i++) {
-    char hex[8];
-    snprintf(hex, sizeof hex, "#%06x", (unsigned)(cfg.color[i] & 0xFFFFFF));
-    c["colors"][STATE_NAMES[i]] = hex;
-  }
+  for (int8_t i = ST_IDLE; i < ST_COUNT; i++) c["colors"][STATE_NAMES[i]] = hexColor(cfg.color[i]);
   for (int8_t i = ST_IDLE; i < ST_COUNT; i++) c["anims"][STATE_NAMES[i]] = ANIM_NAMES[cfg.anim[i]];
-  c["tap"] = ACTION_NAMES[cfg.tap];
-  c["hold"] = ACTION_NAMES[cfg.hold];
-  JsonArray acts = o["actions"].to<JsonArray>();
-  for (const char* n : ACTION_NAMES) acts.add(n);
+  JsonObject lamp = c["lamp"].to<JsonObject>();
+  lamp["color"] = hexColor(cfg.lampColor);
+  lamp["anim"] = ANIM_NAMES[cfg.lampAnim];
+  lamp["off_min"] = cfg.lampOffMin;
+  for (uint8_t m = 0; m < MODE_COUNT; m++) {
+    for (uint8_t g = 0; g < G_COUNT; g++)
+      c["touch"][MODE_NAMES[m]][GESTURE_NAMES[g]] = ACTION_NAMES[touchAction((Mode)m, (Gesture)g)];
+    JsonArray acts = o["actions"][MODE_NAMES[m]].to<JsonArray>();   // дії, доступні в цьому режимі
+    for (uint8_t a = 0; a < ACT_COUNT; a++) if (actionFits(a, (Mode)m)) acts.add(ACTION_NAMES[a]);
+  }
   JsonArray anims = o["animations"].to<JsonArray>();
   for (const char* n : ANIM_NAMES) anims.add(n);
 }
@@ -126,17 +142,28 @@ static void handleConfig() {
   cfg.ttlDoneMin = constrain(in["ttl_done"] | (int)cfg.ttlDoneMin, 0, 1440);
   cfg.ttlAttentionMin = constrain(in["ttl_attention"] | (int)cfg.ttlAttentionMin, 0, 1440);
   for (int8_t i = ST_IDLE; i < ST_COUNT; i++) {
-    const char* hex = in["colors"][STATE_NAMES[i]] | "";
-    if (strlen(hex) == 7 && hex[0] == '#') cfg.color[i] = strtoul(hex + 1, nullptr, 16);
+    parseColor(in["colors"][STATE_NAMES[i]] | "", cfg.color[i]);
     cfg.anim[i] = indexOf(in["anims"][STATE_NAMES[i]] | "", ANIM_NAMES, AN_COUNT, cfg.anim[i]);
   }
-  cfg.tap = indexOf(in["tap"] | "", ACTION_NAMES, ACT_COUNT, cfg.tap);
-  cfg.hold = indexOf(in["hold"] | "", ACTION_NAMES, ACT_COUNT, cfg.hold);
+  if (in["lamp"].is<JsonObjectConst>()) {
+    parseColor(in["lamp"]["color"] | "", cfg.lampColor);
+    cfg.lampAnim = indexOf(in["lamp"]["anim"] | "", ANIM_NAMES, AN_COUNT, cfg.lampAnim);
+    cfg.lampOffMin = constrain(in["lamp"]["off_min"] | (int)cfg.lampOffMin, 0, 1440);
+    lightSwitch(true);                  // зміну видно одразу, таймер рахує заново
+  }
+  for (uint8_t m = 0; m < MODE_COUNT; m++)
+    for (uint8_t g = 0; g < G_COUNT; g++) {
+      uint8_t& slot = touchAction((Mode)m, (Gesture)g);
+      uint8_t  want = indexOf(in["touch"][MODE_NAMES[m]][GESTURE_NAMES[g]] | "", ACTION_NAMES, ACT_COUNT, slot);
+      if (actionFits(want, (Mode)m)) slot = want;
+    }
   saveSettings();
+  uint8_t mode = indexOf(in["mode"] | "", MODE_NAMES, MODE_COUNT, cfg.mode);
+  if (mode != cfg.mode) setMode((Mode)mode);
   handleDebug();
 }
 
-// Кнопки дебаг-меню
+// Разові дії зі сторінки
 static void handleAction() {
   JsonDocument in;
   deserializeJson(in, server.arg("plain"));
@@ -149,7 +176,9 @@ static void handleAction() {
     startPreview((State)st, 6000);
   }
   else if (action == "clear") clearAgents(false);
-  else if (action == "unmute") muted = false;
+  else if (action == "on") lightSwitch(true);
+  else if (action == "off") lightSwitch(false);
+  else if (action == "toggle") lightSwitch(lightOff);
   else if (action == "defaults") { cfg = Settings(); saveSettings(); }
   else return sendError(400, "unknown action");
   handleDebug();

@@ -1,4 +1,5 @@
-// Діоди: один ланцюжок WS2812 на LED_PIN. Колір і анімація залежать від стану WiFi й агентів.
+// Діоди: один ланцюжок WS2812 на LED_PIN. У режимі агентів колір і анімація залежать від стану WiFi й агентів,
+// у режимі лампи — від налаштувань лампи.
 #include <Adafruit_NeoPixel.h>
 #include <WiFi.h>
 #include "app.h"
@@ -6,11 +7,23 @@
 static Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 static uint32_t rainbowUntil = 0, flashUntil = 0, previewUntil = 0;
 static State    previewState = ST_IDLE;
-bool muted = false;
+bool lightOff = false;
+static uint32_t onAt = 0;       // коли світло ввімкнули: від цього моменту рахує таймер режиму лампи
 
 const uint8_t FLASH_MIN = 90;   // спалах на дотик видно й на найтьмянішій яскравості
 
 void lightBegin() { strip.begin(); }
+
+void lightSwitch(bool on) {
+  lightOff = !on;
+  onAt = millis();
+}
+
+uint32_t lampSecondsLeft() {
+  if (cfg.mode != MODE_LAMP || lightOff || !cfg.lampOffMin) return 0;
+  uint32_t total = cfg.lampOffMin * 60UL, passed = (millis() - onAt) / 1000;
+  return passed < total ? total - passed : 0;
+}
 void startRainbow(uint32_t ms) { rainbowUntil = millis() + ms; }
 void flash(uint16_t ms) { flashUntil = millis() + ms; }
 void startPreview(State st, uint32_t ms) { previewState = st; previewUntil = millis() + ms; }
@@ -63,15 +76,20 @@ static float animLevel(uint8_t anim, uint32_t t, uint8_t i, uint8_t n) {
   }
 }
 
-static void showState(State st, uint32_t t) {
-  uint32_t rgb = cfg.color[st];
+static void showLook(uint32_t rgb, uint8_t anim, uint32_t t) {
   strip.clear();
   for (uint8_t i = 0; i < cfg.leds; i++) {
-    float k = animLevel(cfg.anim[st], t, i, cfg.leds);
+    if (anim == AN_RAINBOW) {             // кольори по колу, власний колір не використовується
+      strip.setPixelColor(i, Adafruit_NeoPixel::gamma32(Adafruit_NeoPixel::ColorHSV(t * 8 + i * 65536UL / cfg.leds)));
+      continue;
+    }
+    float k = animLevel(anim, t, i, cfg.leds);
     strip.setPixelColor(i, (uint8_t)((rgb >> 16 & 255) * k), (uint8_t)((rgb >> 8 & 255) * k), (uint8_t)((rgb & 255) * k));
   }
   show();
 }
+
+static void showState(State st, uint32_t t) { showLook(cfg.color[st], cfg.anim[st], t); }
 
 void render() {
   static uint32_t last = 0;
@@ -79,15 +97,16 @@ void render() {
   last = millis();
   float breathe = 0.3f + 0.7f * (0.5f + 0.5f * sinf(last / 1000.0f * PI));  // період 2 с
   if (last < flashUntil) return fill(0xFFFFFF, 1.0f, max(brightness, FLASH_MIN));  // спалах: дотик почуто
-  if (last < rainbowUntil) {                                             // тест із дебаг-меню
-    for (uint8_t i = 0; i < LED_COUNT; i++)
-      strip.setPixelColor(i, i < cfg.leds ? Adafruit_NeoPixel::gamma32(Adafruit_NeoPixel::ColorHSV(last * 8 + i * 21845u)) : 0);
-    return show();
-  }
+  if (last < rainbowUntil) return showLook(0, AN_RAINBOW, last);         // тест діодів зі сторінки
   if (last < previewUntil) return showState(previewState, last);         // проба анімації зі сторінки
+  if (cfg.mode == MODE_LAMP) {                                           // просто лампа: стан WiFi й агентів не показуємо
+    if (!lightOff && cfg.lampOffMin && millis() - onAt > cfg.lampOffMin * 60000UL) lightOff = true;
+    if (lightOff) return fill(0, 0);
+    return showLook(cfg.lampColor, cfg.lampAnim, last);
+  }
   if (portal) return fill(0x003CFF, breathe);                            // синій: режим налаштування
   if (WiFi.status() != WL_CONNECTED) return fill(0x9600FF, breathe);     // фіолетовий: немає WiFi
   State st = aggregate();
-  if (muted) return fill(0, 0);
+  if (lightOff) return fill(0, 0);
   showState(st, last);                                                   // спокій типово чорний, тобто темно
 }

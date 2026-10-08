@@ -3,279 +3,299 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AgentLight</title>
 <style>
-body{font:16px system-ui,sans-serif;background:#111;color:#eee;margin:0;padding:16px;max-width:480px;margin:auto}
-h1{font-size:22px;display:flex;align-items:center;gap:12px}
-h2{font-size:15px;color:#999;margin:24px 0 8px;text-transform:uppercase}
-#dot{width:22px;height:22px;border-radius:50%;background:#333}
-.card{background:#1c1c1c;border-radius:10px;padding:12px}
-button,select,input{font:inherit;padding:10px;border-radius:8px;border:1px solid #444;background:#222;color:#eee}
+:root{--bg:#0f1115;--card:#191c22;--line:#2a2f38;--fg:#e8eaee;--mute:#8b93a1;--acc:#ff8a2a;color-scheme:dark}
+@media(prefers-color-scheme:light){:root{--bg:#f2f3f5;--card:#fff;--line:#d9dde3;--fg:#171a20;--mute:#626b78;--acc:#d9620a;color-scheme:light}}
+*{box-sizing:border-box}
+body{font:16px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--fg);margin:0 auto;padding:16px;max-width:520px}
+header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+h1{font-size:20px;margin:0;flex:1}
+h1 small{display:block;font-size:13px;font-weight:400;color:var(--mute)}
+#dot{width:26px;height:26px;border-radius:50%;background:#333;flex:none;border:1px solid var(--line)}
+h2{font-size:12px;letter-spacing:.08em;color:var(--mute);margin:20px 0 8px;text-transform:uppercase}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+button,select,input{font:inherit;padding:9px 10px;border-radius:9px;border:1px solid var(--line);background:var(--bg);color:var(--fg);min-width:0}
 button{cursor:pointer}
-.row{display:flex;gap:8px;flex-wrap:wrap}
+button:disabled{opacity:.5}
+select,input{width:100%}
+input[type=color]{padding:2px;height:40px}
+input[type=range]{padding:0;accent-color:var(--acc)}
+:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+label{display:block;margin:10px 0 4px;color:var(--mute);font-size:13px}
+small{color:var(--mute);display:block;margin-top:8px;font-size:13px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .row>*{flex:1}
-label{display:block;margin:8px 0 4px;color:#aaa;font-size:14px}
-input,select{width:100%;box-sizing:border-box}
-code{display:block;background:#000;padding:8px;border-radius:6px;font-size:13px;overflow-x:auto;white-space:nowrap}
-small{color:#888}
-.agent{background:#1c1c1c;border-radius:10px;padding:10px 12px;margin-bottom:8px;border-left:5px solid #333}
-.agent .head{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
-.agent .name{font-weight:600}
-.agent .task{margin-top:6px}
-.agent .msg{margin-top:4px;color:#aaa;font-size:14px}
-.agent .meta{margin-top:6px;color:#666;font-size:12px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px}
+.seg button[aria-pressed=true],.on[aria-pressed=true]{border-color:var(--acc);box-shadow:inset 0 0 0 1px var(--acc);font-weight:600}
+table{width:100%;border-collapse:collapse}
+td{padding:4px 6px 4px 0;vertical-align:middle}
+td:first-child{font-size:14px;white-space:nowrap}
+td:last-child{padding-right:0}
+td input[type=color]{width:46px}
+.sw{display:flex;gap:8px;flex-wrap:wrap}
+.sw button{width:32px;height:32px;border-radius:50%;padding:0;flex:none;background:var(--c)}
+.agent{border-left:5px solid #333;padding:8px 10px;margin-bottom:8px;border-radius:8px;background:var(--bg)}
+.agent:last-child{margin-bottom:0}
 .agent div{overflow-wrap:anywhere}
-details{margin-top:24px}
-summary{cursor:pointer;font-size:15px;color:#999;text-transform:uppercase;padding:8px 0}
-.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px;margin:0}
-.kv dt{color:#888}.kv dd{margin:0;overflow-wrap:anywhere}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
-input[type=color]{padding:2px;height:42px}
-#touchdot{display:inline-block;width:12px;height:12px;border-radius:50%;background:#333;margin-right:6px}
+.agent .head{display:flex;justify-content:space-between;gap:8px}
+.agent .name{font-weight:600}
+.agent .msg,.agent .meta{color:var(--mute);font-size:13px;margin-top:3px}
+details{margin-top:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:0 12px}
+summary{cursor:pointer;padding:12px 0;font-weight:600}
+details[open]{padding-bottom:12px}
+code{display:block;background:var(--bg);padding:8px;border-radius:8px;font-size:12px;overflow-x:auto;white-space:nowrap}
+dl{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:14px;margin:0}
+dt{color:var(--mute)}dd{margin:0;overflow-wrap:anywhere}
+[hidden]{display:none!important}
 </style></head><body>
-<h1><span id="dot"></span>AgentLight <small id="state"></small></h1>
+<header>
+  <span id="dot"></span>
+  <h1>AgentLight<small id="state">…</small></h1>
+  <button id="power" class="on" style="flex:none" onclick="act('toggle')">Світло</button>
+</header>
 
-<div id="setup" class="card" hidden>
-  Для роботи підключи девайс до WiFi.
+<div id="setup" class="card" hidden>Лампа ще не в мережі. Додай їй WiFi нижче.</div>
+
+<div class="seg" id="modes">
+  <button data-mode="agents" onclick="setMode('agents')">Стан агентів</button>
+  <button data-mode="lamp" onclick="setMode('lamp')">Лампа</button>
 </div>
 
-<div id="work" hidden>
+<div class="card">
+  <label for="bright" style="margin-top:0">Яскравість <span id="bval"></span></label>
+  <input type="range" id="bright" min="5" max="255" oninput="$('bval').textContent=this.value" onchange="save({brightness:+this.value})">
+</div>
+
+<section id="p_agents">
   <h2>Агенти</h2>
-  <div id="agents"></div>
-  <h2>Підключення</h2>
+  <div class="card" id="agents"></div>
+
+  <h2>Вигляд станів</h2>
   <div class="card">
-    <label>MCP для Claude Code</label>
-    <code id="mcpcmd"></code>
-    <label>REST (для хуків)</label>
-    <code id="restcmd"></code>
+    <table id="looks"></table>
+    <small>Зміну лампа 6 секунд показує наживо. Чорний колір — не світити.</small>
+    <div class="g2" style="grid-template-columns:1fr 1fr 1fr">
+      <div><label for="ttl_busy">Працює гасне, хв</label><input type="number" id="ttl_busy" min="0" max="1440" onchange="save({ttl_busy:+this.value})"></div>
+      <div><label for="ttl_done">Готово гасне, хв</label><input type="number" id="ttl_done" min="0" max="1440" onchange="save({ttl_done:+this.value})"></div>
+      <div><label for="ttl_attention">Чекає гасне, хв</label><input type="number" id="ttl_attention" min="0" max="1440" onchange="save({ttl_attention:+this.value})"></div>
+    </div>
+    <small>Стан гасне, якщо від агента стільки часу немає новин. 0 — не гасне.</small>
   </div>
-</div>
 
-<h2>Тест</h2>
-<div class="row">
-  <button onclick="setState('busy')">🟠 busy</button>
-  <button onclick="setState('waiting')">🔴 waiting</button>
-  <button onclick="setState('done')">🟢 done</button>
-  <button onclick="setState('idle')">⚫ idle</button>
-</div>
-<label>Яскравість <span id="bval"></span></label>
-<input type="range" id="bright" min="5" max="255" onchange="setBright(this.value)">
+  <h2>Дотик у цьому режимі</h2>
+  <div class="card" id="t_agents"></div>
+</section>
 
-<h2>Анімації</h2>
-<div class="card">
-  <div class="grid2">
-    <div><label for="a_busy">Працює</label><select id="a_busy" onchange="setAnim('busy')"></select></div>
-    <div><label for="a_waiting">Чекає на тебе</label><select id="a_waiting" onchange="setAnim('waiting')"></select></div>
-    <div><label for="a_done">Готово</label><select id="a_done" onchange="setAnim('done')"></select></div>
-    <div><label for="a_error">Помилка</label><select id="a_error" onchange="setAnim('error')"></select></div>
-    <div><label for="a_idle">Спокій</label><select id="a_idle" onchange="setAnim('idle')"></select></div>
+<section id="p_lamp" hidden>
+  <h2>Світло</h2>
+  <div class="card">
+    <div class="sw" id="presets"></div>
+    <div class="g2">
+      <div><label for="l_color">Свій колір</label><input type="color" id="l_color" onchange="saveLamp()"></div>
+      <div><label for="l_anim">Анімація</label><select id="l_anim" onchange="saveLamp()"></select></div>
+    </div>
+    <label for="l_off">Вимкнутись через</label>
+    <select id="l_off" onchange="saveLamp()">
+      <option value="0">не вимикатись</option><option value="5">5 хвилин</option><option value="15">15 хвилин</option>
+      <option value="30">30 хвилин</option><option value="60">1 годину</option><option value="120">2 години</option>
+      <option value="240">4 години</option><option value="480">8 годин</option>
+    </select>
+    <small id="l_left"></small>
   </div>
-  <small>Вибір зберігається одразу, а лампа 6 секунд показує, як це виглядає. У спокої лампа темна, доки не задаси колір спокою в «Дебаг» → «Діоди і кольори».</small>
-</div>
 
-<h2>WiFi</h2>
-<div class="card">
+  <h2>Дотик у цьому режимі</h2>
+  <div class="card" id="t_lamp"></div>
+</section>
+
+<details id="d_wifi">
+  <summary>WiFi</summary>
   <div id="wifiinfo"></div>
   <label>Збережені мережі</label>
   <div id="saved"></div>
-  <small>Лампа сама підключається до тієї зі збережених, яку бачить поруч. Якщо жодної немає — за 20 с піднімає точку доступу.</small>
-  <label>Мережа</label>
-  <div class="row"><select id="ssid"></select><button style="flex:0" onclick="scan()">↻</button></div>
-  <label>Пароль</label>
-  <input type="password" id="pass">
-  <div class="row" style="margin-top:12px">
+  <label for="ssid">Додати мережу</label>
+  <div class="row"><select id="ssid"></select><button style="flex:none" onclick="scan()" aria-label="Шукати мережі">↻</button></div>
+  <label for="pass">Пароль</label>
+  <input type="password" id="pass" autocomplete="off">
+  <div class="row" style="margin-top:10px">
     <button onclick="saveWifi()">Додати і підключитись</button>
     <button onclick="resetWifi()">Забути всі</button>
   </div>
-  <small id="msg"></small>
-</div>
+  <small id="msg">Лампа пам'ятає до п'яти мереж і сама підключається до тієї, яку бачить поруч.</small>
+</details>
 
-<details id="debug">
-<summary>Дебаг</summary>
-<div class="card">
-  <dl class="kv" id="info"></dl>
-</div>
+<details>
+  <summary>Підключення агентів</summary>
+  <label>MCP для Claude Code</label>
+  <code id="mcpcmd"></code>
+  <label>REST (для хуків)</label>
+  <code id="restcmd"></code>
+  <label>Перевірити стан уручну</label>
+  <div class="row" id="tests"></div>
+  <div class="row" style="margin-top:8px"><button onclick="act('clear')">Прибрати всіх агентів</button></div>
+</details>
 
-<h2>Сенсор</h2>
-<div class="card">
-  <div><span id="touchdot"></span><span id="touchinfo"></span></div>
-  <div class="grid2">
-    <div><label>Короткий дотик</label><select id="tap"></select></div>
-    <div><label>Утримання</label><select id="hold"></select></div>
+<details id="d_dev">
+  <summary>Пристрій</summary>
+  <dl id="info"></dl>
+  <div class="g2">
+    <div><label for="leds">Діодів у лампі</label><input type="number" id="leds" min="1" onchange="save({leds:+this.value})"></div>
+    <div><label>Сенсор</label><div id="touchinfo" style="font-size:14px;padding:9px 0"></div></div>
   </div>
-</div>
-
-<h2>Діоди і кольори</h2>
-<div class="card">
-  <label>Скільки діодів світити</label>
-  <input type="number" id="leds" min="1">
-  <div class="grid2">
-    <div><label>Працює</label><input type="color" id="c_busy"></div>
-    <div><label>Чекає</label><input type="color" id="c_waiting"></div>
-    <div><label>Готово</label><input type="color" id="c_done"></div>
-    <div><label>Помилка</label><input type="color" id="c_error"></div>
-    <div><label>Спокій (чорний — не світити)</label><input type="color" id="c_idle"></div>
+  <div class="row" style="margin-top:10px">
+    <button onclick="act('rainbow')">Тест діодів</button>
+    <button onclick="if(confirm('Скинути вигляд, дотик і таймери до типових?'))act('defaults').then(load)">Типові</button>
+    <button onclick="act('reboot')">Перезавантажити</button>
   </div>
-</div>
 
-<h2>Коли гасне, хв (0 — ніколи)</h2>
-<div class="card">
-  <div class="grid2">
-    <div><label>Працює, без подій</label><input type="number" id="ttl_busy" min="0" max="1440"></div>
-    <div><label>Готово</label><input type="number" id="ttl_done" min="0" max="1440"></div>
-    <div><label>Чекає / помилка</label><input type="number" id="ttl_attention" min="0" max="1440"></div>
-  </div>
-  <div class="row" style="margin-top:12px"><button onclick="saveCfg()">Зберегти налаштування</button></div>
-  <small id="cfgmsg"></small>
-</div>
-
-<h2>Оновлення прошивки</h2>
-<div class="card">
-  <div id="fwinfo"></div>
+  <h2>Оновлення прошивки</h2>
   <label for="otapass">Пароль оновлення</label>
   <input type="password" id="otapass" autocomplete="off">
-  <div id="otaset">
-    <label for="otanew">Новий пароль (від 6 символів)</label>
-    <input type="password" id="otanew" autocomplete="off">
-    <div class="row" style="margin-top:8px"><button onclick="setOtaPass()">Задати пароль</button></div>
+  <div class="g2">
+    <div><label for="otanew">Новий пароль, від 6 символів</label><input type="password" id="otanew" autocomplete="off"></div>
+    <div><label>&nbsp;</label><button style="width:100%" onclick="setOtaPass()">Задати пароль</button></div>
   </div>
   <label for="fwfile">Файл firmware.bin</label>
   <input type="file" id="fwfile" accept=".bin">
-  <div class="row" style="margin-top:12px"><button id="fwbtn" onclick="uploadFw()">Залити прошивку</button></div>
+  <div class="row" style="margin-top:10px"><button id="fwbtn" onclick="uploadFw()">Залити прошивку</button></div>
   <small id="otamsg"></small>
-</div>
-
-<h2>Дії</h2>
-<div class="row">
-  <button onclick="act('rainbow')">Веселка 10 с</button>
-  <button onclick="act('clear')">Очистити агентів</button>
-  <button onclick="setState('error')">🔴 error</button>
-</div>
-<div class="row" style="margin-top:8px">
-  <button onclick="act('unmute')">Увімкнути світло</button>
-  <button onclick="act('defaults')">Типові налаштування</button>
-  <button onclick="act('reboot')">Перезавантажити</button>
-</div>
 </details>
 
 <script>
 const $=id=>document.getElementById(id);
-const colors={idle:'#333',busy:'#ff8000',waiting:'#ff2020',done:'#20d040',error:'#ff2020'};
-const labels={busy:'працює',waiting:'чекає на тебе',done:'готово',error:'помилка'};
-const dur=s=>s<60?s+' с':s<3600?Math.floor(s/60)+' хв':Math.floor(s/3600)+' год '+Math.floor(s%3600/60)+' хв';
-function add(parent,cls,text){const d=document.createElement('div');d.className=cls;d.textContent=text;parent.appendChild(d);return d;}
+const el=(tag,props,parent)=>{const e=Object.assign(document.createElement(tag),props||{});if(parent)parent.appendChild(e);return e;};
 const post=(url,body)=>fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-let brightTouched=false;
-async function refresh(){
-  try{
-    const s=await (await fetch('/api/status')).json();
-    $('dot').style.background=colors[s.state]||'#333';
-    $('state').textContent=s.state;
-    $('setup').hidden=!s.wifi.portal; $('work').hidden=s.wifi.portal;
-    $('wifiinfo').textContent=s.wifi.portal?('Режим налаштування, точка доступу '+s.wifi.ap)
-      :(s.wifi.ssid+' · '+s.wifi.ip+' · '+s.wifi.rssi+' dBm');
-    const sv=$('saved'); sv.textContent='';
-    if(!s.wifi.saved.length) add(sv,'','немає');
-    for(const n of s.wifi.saved){
-      const r=add(sv,'row','');r.style.marginBottom='6px';r.style.alignItems='center';
-      add(r,'',n+(n===s.wifi.ssid?' · підключена':''));
-      const b=document.createElement('button');b.textContent='Забути';b.style.flex='0';b.onclick=()=>resetWifi(n);r.appendChild(b);
-    }
-    const box=$('agents'); box.textContent='';
-    if(!s.agents.length) add(box,'card','немає активних');
-    for(const a of s.agents){
-      const card=add(box,'agent','');card.style.borderLeftColor=colors[a.state]||'#333';
-      const head=add(card,'head','');
-      add(head,'name',a.name||a.id);
-      add(head,'',(labels[a.state]||a.state)+' · '+dur(a.since)).style.color=colors[a.state];
-      if(a.task) add(card,'task',a.task);
-      if(a.message) add(card,'msg',a.message);
-      add(card,'meta',a.id+' · оновлено '+dur(a.age)+' тому');
-    }
-    $('mcpcmd').textContent='claude mcp add --transport http agentlight http://'+s.wifi.ip+'/mcp';
-    $('restcmd').textContent="curl -X POST 'http://"+s.wifi.ip+"/api/status?state=busy'";
-    if(!brightTouched){$('bright').value=s.brightness;$('bval').textContent=s.brightness;}
-  }catch(e){}
+const save=patch=>post('/api/config',patch).catch(()=>{});
+const act=(action,extra)=>post('/api/action',Object.assign({action},extra)).then(tick).catch(()=>{});
+const dur=s=>s<60?s+' с':s<3600?Math.floor(s/60)+' хв':Math.floor(s/3600)+' год '+Math.floor(s%3600/60)+' хв';
+
+const STATES=['busy','waiting','done','error','idle'];
+const L={
+  state:{busy:'Працює',waiting:'Чекає на тебе',done:'Готово',error:'Помилка',idle:'Спокій'},
+  anim:{solid:'рівно',breathe:'дихання',blink:'блимання',spin:'вогник по колу',comet:'комета',wave:'хвиля',heartbeat:'серцебиття',
+    sparkle:'іскри',pendulum:'маятник',fill:'наповнення',beacon:'маячок',rainbow:'веселка'},
+  act:{none:'нічого',dismiss:'побачив: погасити готово й чекає',brightness:'яскравість по колу',toggle:'увімкнути / вимкнути світло',
+    mode:'перемкнути режим',animation:'наступна анімація',color:'наступний колір'},
+  gesture:{tap:'Дотик',double:'Подвійний дотик',hold:'Утримання'},
+  info:{version:'Версія',build:'Зібрана',uptime:'Працює',reset:'Причина запуску',chip:'Чип',mac:'MAC',heap:'Вільна пам\'ять',
+    heap_min:'Мінімум пам\'яті',led_pin:'Пін діодів',led_max:'Діодів, макс.',touch_pin:'Пін сенсора',ota_ready:'Оновлення по WiFi'},
+};
+const PRESETS=['#ffb060','#ffffff','#ff2000','#ff5a00','#ffc800','#00ff1e','#00d0ff','#0040ff','#9000ff','#ff30a0'];
+let cfg=null,colors={};
+
+function options(sel,names,labels,value){
+  sel.textContent='';
+  for(const n of names)el('option',{value:n,textContent:labels[n]||n},sel);
+  sel.value=value;
 }
-function setState(state){post('/api/status',{state,agent_id:'web'}).then(refresh);}
-function setBright(v){brightTouched=true;$('bval').textContent=v;post('/api/config',{brightness:+v});}
+
+// Будує всі налаштування з відповіді /api/debug
+function build(d){
+  cfg=d.settings;colors=cfg.colors;
+  $('bright').value=cfg.brightness;$('bval').textContent=cfg.brightness;
+  const t=$('looks');t.textContent='';
+  for(const st of STATES){
+    const tr=el('tr',{},t);
+    el('td',{textContent:L.state[st]},tr);
+    const c=el('input',{type:'color',value:cfg.colors[st],ariaLabel:'Колір: '+L.state[st]},el('td',{},tr));
+    const a=el('select',{ariaLabel:'Анімація: '+L.state[st]},el('td',{},tr));
+    options(a,d.animations,L.anim,cfg.anims[st]);
+    c.onchange=()=>look({colors:{[st]:c.value}},st);
+    a.onchange=()=>look({anims:{[st]:a.value}},st);
+  }
+  for(const k of ['ttl_busy','ttl_done','ttl_attention','leds'])$(k).value=cfg[k];
+  $('leds').max=d.device.led_max;
+  for(const mode of ['agents','lamp']){
+    const box=$('t_'+mode);box.textContent='';
+    for(const g in L.gesture){
+      const id='t_'+mode+'_'+g;
+      el('label',{htmlFor:id,textContent:L.gesture[g]},box);
+      const s=el('select',{id},box);
+      options(s,d.actions[mode],L.act,cfg.touch[mode][g]);
+      s.onchange=()=>save({touch:{[mode]:{[g]:s.value}}});
+    }
+  }
+  options($('l_anim'),d.animations,L.anim,cfg.lamp.anim);
+  $('l_color').value=cfg.lamp.color;$('l_off').value=cfg.lamp.off_min;
+  if($('l_off').value!=cfg.lamp.off_min){el('option',{value:cfg.lamp.off_min,textContent:cfg.lamp.off_min+' хв'},$('l_off'));$('l_off').value=cfg.lamp.off_min;}
+  const p=$('presets');p.textContent='';
+  for(const hex of PRESETS){const b=el('button',{ariaLabel:'Колір '+hex},p);b.style.setProperty('--c',hex);b.onclick=()=>{$('l_color').value=hex;saveLamp();};}
+  const tests=$('tests');tests.textContent='';
+  for(const st of STATES)el('button',{textContent:L.state[st],onclick:()=>post('/api/status',{state:st,agent_id:'web',name:'перевірка'}).then(tick)},tests);
+  info(d);
+}
+const look=(patch,st)=>{Object.assign(colors,patch.colors);return save(patch).then(()=>post('/api/action',{action:'preview',state:st}));};
+const saveLamp=()=>{cfg.lamp={color:$('l_color').value,anim:$('l_anim').value,off_min:+$('l_off').value};return save({lamp:cfg.lamp}).then(tick);};
+const setMode=mode=>save({mode}).then(tick);
+const load=()=>fetch('/api/debug').then(r=>r.json()).then(build).catch(()=>{});
+
+function info(d){
+  const dl=$('info');dl.textContent='';
+  for(const k in d.device){
+    let v=d.device[k];
+    if(k==='uptime')v=dur(v);else if(k.startsWith('heap'))v=Math.round(v/1024)+' КБ';else if(k==='ota_ready')v=v?'увімкнене':'вимкнене: задай пароль';
+    el('dt',{textContent:L.info[k]||k},dl);el('dd',{textContent:v},dl);
+  }
+  $('touchinfo').textContent=(d.touch.raw?'палець на сенсорі':'вільний')+' · дотиків: '+d.touch.count;
+}
+
+async function tick(){
+  let s;
+  try{s=await(await fetch('/api/status')).json();}catch(e){$('state').textContent='немає зв\'язку з лампою';return;}
+  const lamp=s.mode==='lamp';
+  for(const b of $('modes').children)b.setAttribute('aria-pressed',b.dataset.mode===s.mode);
+  $('p_agents').hidden=lamp;$('p_lamp').hidden=!lamp;
+  $('power').setAttribute('aria-pressed',!s.off);$('power').textContent=s.off?'Увімкнути':'Вимкнути';
+  $('dot').style.background=s.off?'#000':lamp?(cfg?cfg.lamp.color:'#888'):(colors[s.state]||'#333');
+  $('state').textContent=s.off?'світло вимкнене':lamp?'режим лампи':(L.state[s.state]||s.state).toLowerCase();
+  if(document.activeElement!==$('bright')){$('bright').value=s.brightness;$('bval').textContent=s.brightness;}
+  $('l_left').textContent=s.lamp_left?'Вимкнеться через '+dur(s.lamp_left)+'.':'';
+  $('setup').hidden=!s.wifi.portal;
+  if(s.wifi.portal)$('d_wifi').open=true;
+  const box=$('agents');box.textContent='';
+  if(!s.agents.length)box.textContent='Зараз ніхто не працює.';
+  for(const a of s.agents){
+    const card=el('div',{className:'agent'},box);card.style.borderLeftColor=colors[a.state]||'#333';
+    const head=el('div',{className:'head'},card);
+    el('div',{className:'name',textContent:a.name||a.id},head);
+    el('div',{textContent:(L.state[a.state]||a.state)+' · '+dur(a.since)},head);
+    if(a.task)el('div',{textContent:a.task},card);
+    if(a.message)el('div',{className:'msg',textContent:a.message},card);
+    el('div',{className:'meta',textContent:a.id+' · оновлено '+dur(a.age)+' тому'},card);
+  }
+  $('wifiinfo').textContent=s.wifi.portal?'Режим налаштування, точка доступу '+s.wifi.ap:s.wifi.ssid+' · '+s.wifi.ip+' · '+s.wifi.rssi+' dBm';
+  const sv=$('saved');sv.textContent='';
+  if(!s.wifi.saved.length)sv.textContent='немає';
+  for(const n of s.wifi.saved){
+    const r=el('div',{className:'row'},sv);r.style.marginBottom='6px';
+    el('span',{textContent:n+(n===s.wifi.ssid?' · підключена':'')},r);
+    el('button',{textContent:'Забути',onclick:()=>resetWifi(n)},r).style.flex='none';
+  }
+  $('mcpcmd').textContent='claude mcp add --transport http agentlight http://'+s.wifi.ip+'/mcp';
+  $('restcmd').textContent="curl -X POST 'http://"+s.wifi.ip+"/api/status?state=busy'";
+  if($('d_dev').open)fetch('/api/debug').then(r=>r.json()).then(info).catch(()=>{});
+}
+
 async function scan(){
   $('msg').textContent='Шукаю мережі…';
   try{
-    const list=await (await fetch('/api/scan')).json();
-    const sel=$('ssid'); sel.textContent='';
-    for(const n of list){const o=document.createElement('option');o.value=n.ssid;
-      o.textContent=n.ssid+' ('+n.rssi+' dBm)';sel.appendChild(o);}
-    $('msg').textContent=list.length?'':'Мереж не знайдено';
-  }catch(e){$('msg').textContent='Помилка сканування';}
+    const list=await(await fetch('/api/scan')).json();
+    const sel=$('ssid');sel.textContent='';
+    for(const n of list)el('option',{value:n.ssid,textContent:n.ssid+' ('+n.rssi+' dBm)'},sel);
+    $('msg').textContent=list.length?'':'Мереж не знайдено.';
+  }catch(e){$('msg').textContent='Помилка пошуку мереж.';}
 }
 function saveWifi(){
   if(!$('ssid').value)return;
   post('/api/wifi',{ssid:$('ssid').value,pass:$('pass').value});
-  $('msg').textContent='Збережено. Девайс перезавантажується і підключається; якщо за 20 с не вийде — знову підніме точку доступу.';
+  $('msg').textContent='Збережено. Лампа перезавантажується і підключається; якщо за 20 с не вийде — знову підніме точку доступу.';
 }
-function resetWifi(ssid){post('/api/wifi/reset',ssid?{ssid}:{});$('msg').textContent=(ssid?'Мережу «'+ssid+'» забуто':'Усі мережі забуто')+', девайс перезавантажується.';}
-const animLabels={solid:'рівно',breathe:'дихання',blink:'блимання',spin:'вогник по колу',comet:'комета',wave:'хвиля',heartbeat:'серцебиття',sparkle:'іскри',pendulum:'маятник',fill:'наповнення',beacon:'маячок'};
-const animStates=['busy','waiting','done','error','idle'];
-function fillAnims(d){
-  for(const st of animStates){
-    const sel=$('a_'+st); sel.textContent='';
-    for(const a of d.animations){const o=document.createElement('option');o.value=a;o.textContent=animLabels[a]||a;sel.appendChild(o);}
-    sel.value=d.settings.anims[st];
-  }
-}
-async function setAnim(st){
-  try{await post('/api/config',{anims:{[st]:$('a_'+st).value}});await post('/api/action',{action:'preview',state:st});}catch(e){}
-}
-fetch('/api/debug').then(r=>r.json()).then(fillAnims).catch(()=>{});
-const actLabels={none:'нічого',dismiss:'побачив: гасить готово і чекає',brightness:'яскравість по колу',mute:'вимкнути / увімкнути світло'};
-const infoLabels={version:'Версія',ota_ready:'Оновлення по WiFi',uptime:'Працює',reset:'Причина запуску',build:'Прошивка зібрана',chip:'Чип',mac:'MAC',heap:'Вільна пам\'ять',heap_min:'Мінімум пам\'яті',led_pin:'Пін діодів',led_max:'Діодів, макс.',touch_pin:'Пін сенсора'};
-let cfgLoaded=false;
-function fillCfg(d){
-  const c=d.settings;
-  for(const id of ['tap','hold']){
-    const sel=$(id); sel.textContent='';
-    for(const a of d.actions){const o=document.createElement('option');o.value=a;o.textContent=actLabels[a]||a;sel.appendChild(o);}
-    sel.value=c[id];
-  }
-  $('leds').max=d.device.led_max; $('leds').value=c.leds;
-  for(const k of ['ttl_busy','ttl_done','ttl_attention']) $(k).value=c[k];
-  for(const k in c.colors) $('c_'+k).value=c.colors[k];
-  cfgLoaded=true;
-}
-async function refreshDebug(){
-  if(!$('debug').open)return;
-  try{
-    const d=await (await fetch('/api/debug')).json();
-    const dl=$('info'); dl.textContent='';
-    const row=(k,v)=>{const dt=document.createElement('dt');dt.textContent=k;const dd=document.createElement('dd');dd.textContent=v;dl.append(dt,dd);};
-    for(const k in d.device){
-      let v=d.device[k];
-      if(k==='uptime')v=dur(v); else if(k.startsWith('heap'))v=Math.round(v/1024)+' КБ'; else if(k==='ota_ready')v=v?'увімкнене':'вимкнене: задай пароль';
-      row(infoLabels[k]||k,v);
-    }
-    row('WiFi',d.wifi.portal?'точка доступу '+d.wifi.ap:d.wifi.ssid+' · '+d.wifi.rssi+' dBm');
-    row('Світло',d.muted?'вимкнене дотиком':'увімкнене');
-    $('touchdot').style.background=d.touch.raw?'#20d040':'#333';
-    $('touchinfo').textContent=(d.touch.raw?'палець на сенсорі':'не торкаються')+' · дотиків: '+d.touch.count+(d.touch.count?' · останній '+dur(d.touch.ago)+' тому':'');
-    $('fwinfo').textContent='Зараз: версія '+d.device.version+', зібрана '+d.device.build;
-    $('otapass').placeholder=d.device.ota_ready?'':'ще не заданий — залиш порожнім';
-    if(!cfgLoaded)fillCfg(d);
-  }catch(e){}
-}
-async function saveCfg(){
-  const body={leds:+$('leds').value,tap:$('tap').value,hold:$('hold').value,colors:{}};
-  for(const k of ['ttl_busy','ttl_done','ttl_attention']) body[k]=+$(k).value;
-  for(const k of animStates) body.colors[k]=$('c_'+k).value;
-  try{fillCfg(await (await post('/api/config',body)).json());$('cfgmsg').textContent='Збережено';}
-  catch(e){$('cfgmsg').textContent='Не вдалося зберегти';}
-}
-async function act(action){
-  try{const r=await post('/api/action',{action});if(action==='defaults'){const d=await r.json();fillCfg(d);fillAnims(d);}}catch(e){}
-  refresh();
+function resetWifi(ssid){
+  post('/api/wifi/reset',ssid?{ssid}:{});
+  $('msg').textContent=(ssid?'Мережу «'+ssid+'» забуто':'Усі мережі забуто')+', лампа перезавантажується.';
 }
 async function setOtaPass(){
   try{
-    const r=await post('/api/ota/password',{old:$('otapass').value,new:$('otanew').value});
-    const j=await r.json();
+    const j=await(await post('/api/ota/password',{old:$('otapass').value,new:$('otanew').value})).json();
     $('otamsg').textContent=j.ok?'Пароль задано.':({'wrong password':'Невірний поточний пароль.','password too short':'Пароль закороткий.'}[j.error]||j.error);
     if(j.ok){$('otapass').value=$('otanew').value;$('otanew').value='';}
   }catch(e){$('otamsg').textContent='Не вдалося задати пароль.';}
@@ -299,6 +319,6 @@ function uploadFw(){
   $('fwbtn').disabled=true;$('otamsg').textContent='Заливаю…';
   x.send(body);
 }
-$('debug').addEventListener('toggle',refreshDebug);
-refresh();setInterval(refresh,2000);setInterval(refreshDebug,500);scan();
+$('d_wifi').addEventListener('toggle',()=>{if($('d_wifi').open&&!$('ssid').options.length)scan();});
+load().then(tick);setInterval(tick,2000);
 </script></body></html>
