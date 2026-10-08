@@ -1,0 +1,18 @@
+name: Канарка агентів
+
+# Раз на тиждень ставить найсвіжіші CLI агентів і перевіряє, що вони досі приймають наші хуки.
+# Червоний запуск означає: агент змінив формат, і лампа з його новою версією, найімовірніше, мовчить.
+on:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: python3 tests/canary.py

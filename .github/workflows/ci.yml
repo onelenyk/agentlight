@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  hooks:
+    name: Хуки, розбір подій, встановлювач
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4          # один тест встановлювача йде через node замість python3
+        with:
+          node-version: 22
+      - run: python3 -m unittest discover -s tests -v
+
+  firmware:
+    name: Збірка прошивки
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: platformio-${{ hashFiles('firmware/platformio.ini') }}
+      - run: pip install platformio
+      # збірка падає й тоді, коли прошивка перестає влазити в слот 1,25 МБ, потрібний для оновлення по WiFi
+      - run: pio run -d firmware -e c3_supermini -e touchtest
+
+  case:
+    name: Корпус
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install -r case/requirements.txt
+      - run: python3 case/build.py
+      - run: python3 case/verify.py
