@@ -191,7 +191,7 @@ ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 65
     <h2>Підключення</h2>
     <div class="wiring-cols">
       <div>
-        <div class="diagram"><svg viewBox="0 0 780 440" role="img" aria-label="Схема: 5V і GND плати йдуть на всі три платки діодів, GPIO4 через резистор 330 Ом на DIN першої, далі DOUT кожної на DIN наступної. Сенсор TTP223: VCC від 3V3, GND від GND, вихід I/O на GPIO1">
+        <div class="diagram"><svg viewBox="0 0 780 440" role="img" aria-label="Схема: 5V і GND плати йдуть на всі три платки діодів, GPIO3 через резистор 330 Ом на DIN першої, далі DOUT кожної на DIN наступної. Сенсор TTP223: VCC від 3V3, GND від GND, вихід I/O на GPIO1">
 <defs><marker id="arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" class="f-data"/></marker><marker id="arr2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" class="f-sig"/></marker></defs>
 <rect class="pcb" x="600" y="34" width="140" height="266" rx="8"/>
 <rect class="pad" x="645" y="20" width="50" height="34" rx="6"/><text class="t" x="670" y="41" text-anchor="middle">USB-C</text>
@@ -199,8 +199,8 @@ ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 65
 <circle class="pad used" cx="612" cy="80" r="5.5"/><text class="t on" x="623" y="84">5V</text>
 <circle class="pad used" cx="612" cy="108" r="5.5"/><text class="t on" x="623" y="112">GND</text>
 <circle class="pad used" cx="612" cy="136" r="5.5"/><text class="t on" x="623" y="140">3V3</text>
-<circle class="pad used" cx="612" cy="164" r="5.5"/><text class="t on" x="623" y="168">GPIO4</text>
-<circle class="pad" cx="612" cy="192" r="5.5"/><text class="t" x="623" y="196">GPIO3</text>
+<circle class="pad" cx="612" cy="164" r="5.5"/><text class="t" x="623" y="168">GPIO4</text>
+<circle class="pad used" cx="612" cy="192" r="5.5"/><text class="t on" x="623" y="196">GPIO3</text>
 <circle class="pad" cx="612" cy="220" r="5.5"/><text class="t" x="623" y="224">GPIO2</text>
 <circle class="pad used" cx="612" cy="248" r="5.5"/><text class="t on" x="623" y="252">GPIO1</text>
 <circle class="pad" cx="612" cy="276" r="5.5"/><text class="t" x="623" y="280">GPIO0</text>
@@ -219,7 +219,7 @@ ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 65
 <path class="wire w-gnd" d="M520 262 V340 H464"/>
 <circle class="f-gnd" cx="440" cy="262" r="4"/><circle class="f-gnd" cx="285" cy="262" r="4"/><circle class="f-gnd" cx="520" cy="262" r="4"/>
 <text class="t on" x="350" y="282" text-anchor="middle">GND · чорний</text>
-<path class="wire w-data" d="M612 164 H536"/><path class="wire w-data" d="M492 164 H470" marker-end="url(#arr)"/>
+<path class="wire w-data" d="M612 192 H592 V164 H536"/><path class="wire w-data" d="M492 164 H470" marker-end="url(#arr)"/>
 <rect class="pad used" x="492" y="155" width="44" height="18" rx="4"/><text class="t on" x="514" y="146" text-anchor="middle">330 Ом</text>
 <path class="wire w-data" d="M414 164 H315" marker-end="url(#arr)"/><path class="wire w-data" d="M259 164 H160" marker-end="url(#arr)"/>
 <text class="t on" x="364" y="146" text-anchor="middle">дані · зелений</text>
@@ -248,7 +248,7 @@ ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 65
             <tbody>
               <tr><td><span class="swatch" style="--c:#e5484d"></span>червоний</td><td><b>5V</b> плати → 5V платки 1, далі на 5V платок 2 і 3</td><td class="num">≈ 65 + 2 × 30 мм</td></tr>
               <tr><td><span class="swatch" style="--c:var(--fg)"></span>чорний</td><td><b>GND</b> плати → GND платки 1, далі на GND платок 2 і 3</td><td class="num">≈ 65 + 2 × 30 мм</td></tr>
-              <tr><td><span class="swatch" style="--c:#2fa858"></span>зелений</td><td><b>GPIO4</b> → резистор 330 Ом → DIN платки 1</td><td class="num">≈ 65 мм</td></tr>
+              <tr><td><span class="swatch" style="--c:#2fa858"></span>зелений</td><td><b>GPIO3</b> → резистор 330 Ом → DIN платки 1</td><td class="num">≈ 65 мм</td></tr>
               <tr><td><span class="swatch" style="--c:#2fa858"></span>зелений</td><td>DOUT платки 1 → DIN платки 2, DOUT платки 2 → DIN платки 3</td><td class="num">2 × 30 мм</td></tr>
               <tr><td><span class="swatch" style="--c:#e0a100"></span>жовтий</td><td><b>3V3</b> плати → VCC сенсора</td><td class="num">≈ 80 мм</td></tr>
               <tr><td><span class="swatch" style="--c:var(--fg)"></span>чорний</td><td><b>GND</b> плати (другий дріт у той самий отвір) → GND сенсора</td><td class="num">≈ 80 мм</td></tr>
@@ -258,7 +258,7 @@ ul.plain { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 65
         </div>
         <p class="note">Дріт 28 AWG у силіконі, як у кулі. Три дроти від плати йдуть угору крізь колодязь у центрі диска; запас у довжині потрібен, щоб диск можна було вийняти, не відпаюючи. Довжини прикинуті з моделі, а не з готового виробу.</p>
         <p class="note">Сенсор TTP223 сидить у стелі розсіювача, його три дроти йдуть униз тим самим колодязем, що й дроти діодів. Живи його від 3V3, а не від 5V: тоді вихід модуля має безпечний для плати рівень. Прошивка сенсор ще не читає.</p>
-        <p class="note">Резистор 330 Ом сховай у термозбіжку біля плати. Дані діодів — лише GPIO4. GPIO2, GPIO8 і GPIO9 не чіпай: від них залежить завантаження плати.</p>
+        <p class="note">Резистор 330 Ом сховай у термозбіжку біля плати. Дані діодів — GPIO3. GPIO2, GPIO8 і GPIO9 не чіпай: від них залежить завантаження плати.</p>
       </div>
     </div>
   </section>

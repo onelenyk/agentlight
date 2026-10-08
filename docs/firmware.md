@@ -10,7 +10,7 @@ pio run -e touchtest -t upload # тестова: без WiFi, діоди сві�
 AGENTLIGHT_OTA_PASSWORD=... pio run -e ota -t upload   # оновлення по WiFi, без кабелю
 ```
 
-Піни задаються в `firmware/platformio.ini`: дані діодів `LED_PIN=4`, до `LED_COUNT=10` діодів у ланцюжку, сенсор `TOUCH_PIN=1`.
+Піни задаються в `firmware/platformio.ini`: дані діодів `LED_PIN=3`, до `LED_COUNT=10` діодів у ланцюжку, сенсор `TOUCH_PIN=1`.
 
 ## Як вона працює
 
