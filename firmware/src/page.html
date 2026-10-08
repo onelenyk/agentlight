@@ -44,6 +44,9 @@ details{margin-top:12px;background:var(--card);border:1px solid var(--line);bord
 summary{cursor:pointer;padding:12px 0;font-weight:600}
 details[open]{padding-bottom:12px}
 code{display:block;background:var(--bg);padding:8px;border-radius:8px;font-size:12px;overflow-x:auto;white-space:nowrap}
+ol{margin:10px 0 0;padding-left:20px;font-size:14px}
+ol li{margin-bottom:6px}
+ol code{margin-top:4px}
 dl{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:14px;margin:0}
 dt{color:var(--mute)}dd{margin:0;overflow-wrap:anywhere}
 [hidden]{display:none!important}
@@ -125,10 +128,15 @@ dt{color:var(--mute)}dd{margin:0;overflow-wrap:anywhere}
 
 <details>
   <summary>Підключення агентів</summary>
-  <label>MCP для Claude Code</label>
-  <code id="mcpcmd"></code>
-  <label>REST (для хуків)</label>
+  <label for="tool">Який агент</label>
+  <select id="tool" onchange="howto()"></select>
+  <ol id="steps"></ol>
+  <small id="toolnote"></small>
+  <small>Файли з теки <b>hooks/</b> — у репозиторії проєкту. Після зміни налаштувань перезапусти агента.</small>
+  <label>Будь-яка програма: один запит</label>
   <code id="restcmd"></code>
+  <label>MCP-сервер лампи (агент сам повідомляє стан)</label>
+  <code id="mcpcmd"></code>
   <label>Перевірити стан уручну</label>
   <div class="row" id="tests"></div>
   <div class="row" style="margin-top:8px"><button onclick="act('clear')">Прибрати всіх агентів</button></div>
@@ -179,6 +187,34 @@ const L={
   info:{version:'Версія',build:'Зібрана',uptime:'Працює',reset:'Причина запуску',chip:'Чип',mac:'MAC',heap:'Вільна пам\'ять',
     heap_min:'Мінімум пам\'яті',led_pin:'Пін діодів',led_max:'Діодів, макс.',touch_pin:'Пін сенсора',ota_ready:'Оновлення по WiFi'},
 };
+// Як підключити агента: кроки з файлами з теки hooks/ репозиторію. sh — чи потрібен спільний скрипт у ~/.agentlight/
+const SH='mkdir -p ~/.agentlight && cp hooks/agentlight.sh ~/.agentlight/ && chmod +x ~/.agentlight/agentlight.sh';
+const TOOLS={
+  claude:{name:'Claude Code',steps:[['Скопіюй скрипт','mkdir -p ~/.claude/hooks && cp hooks/agentlight.sh ~/.claude/hooks/ && chmod +x ~/.claude/hooks/agentlight.sh'],
+    ['Розділ hooks із hooks/claude/settings.json додай у ~/.claude/settings.json']],note:'Усі п\'ять станів. Перевірено.'},
+  opencode:{name:'OpenCode',steps:[['Скопіюй плагін','mkdir -p ~/.config/opencode/plugins && cp hooks/opencode/agentlight.js ~/.config/opencode/plugins/']],
+    note:'Усі стани, крім виходу з програми. Працює та готово перевірені на справжньому OpenCode.'},
+  antigravity:{name:'Antigravity',sh:1,steps:[['hooks/antigravity/hooks.json поклади як ~/.gemini/config/hooks.json']],
+    note:'Працює, готово, помилка; стану «чекає» немає. На справжньому Antigravity не перевірено.'},
+  gemini:{name:'Gemini CLI',sh:1,steps:[['Розділ hooks із hooks/gemini/settings.json додай у ~/.gemini/settings.json']],
+    note:'Без стану «помилка». На справжньому Gemini CLI не перевірено.'},
+  codex:{name:'Codex CLI',sh:1,steps:[['Вміст hooks/codex/hooks.json додай у ~/.codex/hooks.json']],
+    note:'Без стану «помилка». Перевірено лише тестовими подіями.'},
+  copilot:{name:'Copilot CLI',sh:1,steps:[['hooks/copilot/agentlight.json поклади в ~/.copilot/hooks/']],
+    note:'Усі п\'ять станів. Перевірено лише тестовими подіями.'},
+  qwen:{name:'Qwen Code',sh:1,steps:[['Розділ hooks із hooks/qwen/settings.json додай у ~/.qwen/settings.json']],
+    note:'Усі п\'ять станів. Перевірено лише тестовими подіями.'},
+  cursor:{name:'Cursor',sh:1,steps:[['Вміст hooks/cursor/hooks.json додай у ~/.cursor/hooks.json']],
+    note:'Без стану «чекає». Cursor може сам підхоплювати хуки Claude Code — тоді цей крок зайвий. Перевірено лише тестовими подіями.'},
+};
+function howto(){
+  const t=TOOLS[$('tool').value],ol=$('steps');ol.textContent='';
+  for(const [text,cmd] of (t.sh?[['Скопіюй скрипт',SH]]:[]).concat(t.steps)){
+    const li=el('li',{textContent:text},ol);
+    if(cmd)el('code',{textContent:cmd},li);
+  }
+  $('toolnote').textContent=t.note;
+}
 const PRESETS=['#ffb060','#ffffff','#ff2000','#ff5a00','#ffc800','#00ff1e','#00d0ff','#0040ff','#9000ff','#ff30a0'];
 let cfg=null,colors={};
 
@@ -219,6 +255,7 @@ function build(d){
   if($('l_off').value!=cfg.lamp.off_min){el('option',{value:cfg.lamp.off_min,textContent:cfg.lamp.off_min+' хв'},$('l_off'));$('l_off').value=cfg.lamp.off_min;}
   const p=$('presets');p.textContent='';
   for(const hex of PRESETS){const b=el('button',{ariaLabel:'Колір '+hex},p);b.style.setProperty('--c',hex);b.onclick=()=>{$('l_color').value=hex;saveLamp();};}
+  if(!$('tool').options.length){for(const k in TOOLS)el('option',{value:k,textContent:TOOLS[k].name},$('tool'));howto();}
   const tests=$('tests');tests.textContent='';
   for(const st of STATES)el('button',{textContent:L.state[st],onclick:()=>post('/api/status',{state:st,agent_id:'web',name:'перевірка'}).then(tick)},tests);
   info(d);
@@ -271,7 +308,7 @@ async function tick(){
     el('button',{textContent:'Забути',onclick:()=>resetWifi(n)},r).style.flex='none';
   }
   $('mcpcmd').textContent='claude mcp add --transport http agentlight http://'+s.wifi.ip+'/mcp';
-  $('restcmd').textContent="curl -X POST 'http://"+s.wifi.ip+"/api/status?state=busy'";
+  $('restcmd').textContent="curl -X POST 'http://"+s.wifi.ip+"/api/status?state=busy&agent_id=my-agent&name=project'";
   if($('d_dev').open)fetch('/api/debug').then(r=>r.json()).then(info).catch(()=>{});
 }
 
