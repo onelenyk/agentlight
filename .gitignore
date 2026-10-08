@@ -3,3 +3,4 @@
 .venv/
 __pycache__/
 .DS_Store
+src/page_gz.h

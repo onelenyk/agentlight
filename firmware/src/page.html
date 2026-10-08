@@ -1,8 +1,4 @@
-// Єдина веб-сторінка девайса: статус, тест кольорів, яскравість, налаштування WiFi, дебаг-меню.
-#pragma once
-#include <Arduino.h>
-
-const char PAGE_HTML[] PROGMEM = R"HTML(<!doctype html>
+<!doctype html>
 <html lang="uk"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AgentLight</title>
@@ -97,7 +93,7 @@ input[type=color]{padding:2px;height:42px}
 
 <h2>Діоди і кольори</h2>
 <div class="card">
-  <label>Скільки діодів світити (на кожному виході)</label>
+  <label>Скільки діодів світити</label>
   <input type="number" id="leds" min="1">
   <div class="grid2">
     <div><label>Працює</label><input type="color" id="c_busy"></div>
@@ -189,7 +185,7 @@ function saveWifi(){
 }
 function resetWifi(ssid){post('/api/wifi/reset',ssid?{ssid}:{});$('msg').textContent=(ssid?'Мережу «'+ssid+'» забуто':'Усі мережі забуто')+', девайс перезавантажується.';}
 const actLabels={none:'нічого',dismiss:'побачив: гасить готово і чекає',brightness:'яскравість по колу',mute:'вимкнути / увімкнути світло'};
-const infoLabels={uptime:'Працює',reset:'Причина запуску',build:'Прошивка зібрана',chip:'Чип',mac:'MAC',heap:'Вільна пам\'ять',heap_min:'Мінімум пам\'яті',led_pins:'Піни діодів',led_max:'Діодів на вихід, макс.',touch_pin:'Пін сенсора'};
+const infoLabels={uptime:'Працює',reset:'Причина запуску',build:'Прошивка зібрана',chip:'Чип',mac:'MAC',heap:'Вільна пам\'ять',heap_min:'Мінімум пам\'яті',led_pin:'Пін діодів',led_max:'Діодів, макс.',touch_pin:'Пін сенсора'};
 let cfgLoaded=false;
 function fillCfg(d){
   const c=d.settings;
@@ -234,4 +230,4 @@ async function act(action){
 }
 $('debug').addEventListener('toggle',refreshDebug);
 refresh();setInterval(refresh,2000);setInterval(refreshDebug,500);scan();
-</script></body></html>)HTML";
+</script></body></html>

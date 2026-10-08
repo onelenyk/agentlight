@@ -7,23 +7,18 @@
 const uint8_t  BRIGHTNESS = 120;
 const uint16_t DEBOUNCE_MS = 40;
 
-Adafruit_NeoPixel stripA(LED_COUNT, LED_PIN_A, NEO_GRB + NEO_KHZ800);
-Adafruit_NeoPixel stripB(LED_COUNT, LED_PIN_B, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 
 void fill(uint32_t c) {
-  stripA.fill(c);
-  stripB.fill(c);
-  stripA.show();
-  stripB.show();
+  strip.fill(c);
+  strip.show();
 }
 
 void setup() {
   Serial.begin(115200);
   pinMode(TOUCH_PIN, INPUT_PULLDOWN);   // без модуля пін не «плаває» і дотиків не вигадує
-  stripA.begin();
-  stripB.begin();
-  stripA.setBrightness(BRIGHTNESS);
-  stripB.setBrightness(BRIGHTNESS);
+  strip.begin();
+  strip.setBrightness(BRIGHTNESS);
   randomSeed(esp_random());
   fill(0);
 }
