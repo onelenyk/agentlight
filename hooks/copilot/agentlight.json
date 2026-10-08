@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "hooks": {
+    "userPromptSubmitted": [
+      {
+        "type": "command",
+        "bash": "\"$HOME/.agentlight/agentlight.sh\" busy copilot"
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "\"$HOME/.agentlight/agentlight.sh\" busy copilot"
+      }
+    ],
+    "postToolUseFailure": [
+      {
+        "type": "command",
+        "bash": "\"$HOME/.agentlight/agentlight.sh\" busy copilot"
+      }
+    ],
+    "notification": [
+      {
+        "type": "command",
+        "bash": "\"$HOME/.agentlight/agentlight.sh\" notification copilot"
+      }
+    ],
+    "agentStop": [
+      {
+        "type": "command",
+        "bash": "\"$HOME/.agentlight/agentlight.sh\" done copilot"
+      }
+    ],
+    "errorOccurred": [
+      {
+        "type": "command",
+        "bash": "\"$HOME/.agentlight/agentlight.sh\" error copilot"
+      }
+    ],
+    "sessionEnd": [
+      {
+        "type": "command",
+        "bash": "\"$HOME/.agentlight/agentlight.sh\" idle copilot"
+      }
+    ]
+  }
+}

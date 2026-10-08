@@ -1,0 +1,64 @@
+{
+  "hooks": {
+    "BeforeAgent": [
+      {
+        "hooks": [
+          {
+            "name": "agentlight",
+            "type": "command",
+            "command": "\"$HOME/.agentlight/agentlight.sh\" busy gemini",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "BeforeTool": [
+      {
+        "hooks": [
+          {
+            "name": "agentlight",
+            "type": "command",
+            "command": "\"$HOME/.agentlight/agentlight.sh\" busy gemini",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "name": "agentlight",
+            "type": "command",
+            "command": "\"$HOME/.agentlight/agentlight.sh\" notification gemini",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "AfterAgent": [
+      {
+        "hooks": [
+          {
+            "name": "agentlight",
+            "type": "command",
+            "command": "\"$HOME/.agentlight/agentlight.sh\" done gemini",
+            "timeout": 5000
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "name": "agentlight",
+            "type": "command",
+            "command": "\"$HOME/.agentlight/agentlight.sh\" idle gemini",
+            "timeout": 5000
+          }
+        ]
+      }
+    ]
+  }
+}

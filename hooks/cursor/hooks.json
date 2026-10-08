@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeSubmitPrompt": [
+      {
+        "command": "\"$HOME/.agentlight/agentlight.sh\" busy cursor"
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "\"$HOME/.agentlight/agentlight.sh\" busy cursor"
+      }
+    ],
+    "postToolUseFailure": [
+      {
+        "command": "\"$HOME/.agentlight/agentlight.sh\" busy cursor"
+      }
+    ],
+    "stop": [
+      {
+        "command": "\"$HOME/.agentlight/agentlight.sh\" stop cursor"
+      }
+    ],
+    "sessionEnd": [
+      {
+        "command": "\"$HOME/.agentlight/agentlight.sh\" idle cursor"
+      }
+    ]
+  }
+}
