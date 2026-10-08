@@ -64,6 +64,8 @@ class MockLamp:
                     return self.reply(404, b"Not found", "text/plain")
                 if self.path == "/api/status":
                     return self.reply(200, json.dumps({"agents": list(lamp.agents.values())}).encode())
+                if self.path == "/events":      # лише в імітації: усе прийняте по порядку, для перевірок ззовні
+                    return self.reply(200, json.dumps(lamp.events, ensure_ascii=False).encode())
                 self.reply(404, b"Not found", "text/plain")
 
             def do_POST(self):
