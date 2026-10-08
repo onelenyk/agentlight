@@ -88,6 +88,6 @@ void render() {
   if (portal) return fill(0x003CFF, breathe);                            // синій: режим налаштування
   if (WiFi.status() != WL_CONNECTED) return fill(0x9600FF, breathe);     // фіолетовий: немає WiFi
   State st = aggregate();
-  if (muted || st == ST_IDLE) return fill(0, 0);
-  showState(st, last);
+  if (muted) return fill(0, 0);
+  showState(st, last);                                                   // спокій типово чорний, тобто темно
 }

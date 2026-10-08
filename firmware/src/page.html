@@ -66,8 +66,9 @@ input[type=color]{padding:2px;height:42px}
     <div><label for="a_waiting">Чекає на тебе</label><select id="a_waiting" onchange="setAnim('waiting')"></select></div>
     <div><label for="a_done">Готово</label><select id="a_done" onchange="setAnim('done')"></select></div>
     <div><label for="a_error">Помилка</label><select id="a_error" onchange="setAnim('error')"></select></div>
+    <div><label for="a_idle">Спокій</label><select id="a_idle" onchange="setAnim('idle')"></select></div>
   </div>
-  <small>Вибір зберігається одразу, а лампа 6 секунд показує, як це виглядає.</small>
+  <small>Вибір зберігається одразу, а лампа 6 секунд показує, як це виглядає. У спокої лампа темна, доки не задаси колір спокою в «Дебаг» → «Діоди і кольори».</small>
 </div>
 
 <h2>WiFi</h2>
@@ -111,6 +112,7 @@ input[type=color]{padding:2px;height:42px}
     <div><label>Чекає</label><input type="color" id="c_waiting"></div>
     <div><label>Готово</label><input type="color" id="c_done"></div>
     <div><label>Помилка</label><input type="color" id="c_error"></div>
+    <div><label>Спокій (чорний — не світити)</label><input type="color" id="c_idle"></div>
   </div>
 </div>
 
@@ -212,7 +214,7 @@ function saveWifi(){
 }
 function resetWifi(ssid){post('/api/wifi/reset',ssid?{ssid}:{});$('msg').textContent=(ssid?'Мережу «'+ssid+'» забуто':'Усі мережі забуто')+', девайс перезавантажується.';}
 const animLabels={solid:'рівно',breathe:'дихання',blink:'блимання',spin:'вогник по колу',comet:'комета',wave:'хвиля',heartbeat:'серцебиття',sparkle:'іскри',pendulum:'маятник',fill:'наповнення',beacon:'маячок'};
-const animStates=['busy','waiting','done','error'];
+const animStates=['busy','waiting','done','error','idle'];
 function fillAnims(d){
   for(const st of animStates){
     const sel=$('a_'+st); sel.textContent='';
@@ -262,7 +264,7 @@ async function refreshDebug(){
 async function saveCfg(){
   const body={leds:+$('leds').value,tap:$('tap').value,hold:$('hold').value,colors:{}};
   for(const k of ['ttl_busy','ttl_done','ttl_attention']) body[k]=+$(k).value;
-  for(const k of ['busy','waiting','done','error']) body.colors[k]=$('c_'+k).value;
+  for(const k of animStates) body.colors[k]=$('c_'+k).value;
   try{fillCfg(await (await post('/api/config',body)).json());$('cfgmsg').textContent='Збережено';}
   catch(e){$('cfgmsg').textContent='Не вдалося зберегти';}
 }

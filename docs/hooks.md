@@ -2,12 +2,15 @@
 
 `hooks/agentlight.sh` — скрипт, який Claude Code викликає на подіях сесії. Він читає JSON події і шле стан на лампу.
 
-| Подія | Стан |
+| Стан | Події |
 |---|---|
-| UserPromptSubmit, PostToolUse, PostToolUseFailure | працює |
-| PermissionRequest, PreToolUse (AskUserQuestion), Notification (дозвіл або питання) | чекає |
-| Stop | готово |
-| SessionEnd | вимкнено |
+| працює | UserPromptSubmit, PostToolUse, PostToolUseFailure, PermissionDenied, ElicitationResult, PreCompact |
+| чекає | PermissionRequest, PreToolUse (AskUserQuestion), Elicitation, Notification (дозвіл, питання, фонова сесія чекає) |
+| готово | Stop |
+| помилка | StopFailure |
+| спокій | SessionEnd |
+
+Модель станів, прогалини Claude Code і підтримка інших агентів — у [agents.md](agents.md).
 
 Що передається на лампу: `agent_id` (перші 8 символів `session_id`, тож паралельні сесії не затирають одна одну), назва теки проєкту, запит користувача й поточна дія — інструмент чи питання.
 

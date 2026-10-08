@@ -1,35 +1,11 @@
 {
   "hooks": {
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$HOME/.claude/hooks/agentlight.sh\" idle",
-            "async": true,
-            "timeout": 5
-          }
-        ]
-      }
-    ],
     "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
             "command": "\"$HOME/.claude/hooks/agentlight.sh\" busy",
-            "async": true,
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"$HOME/.claude/hooks/agentlight.sh\" done",
             "async": true,
             "timeout": 5
           }
@@ -50,6 +26,45 @@
       }
     ],
     "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/agentlight.sh\" busy",
+            "async": true,
+            "timeout": 5
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/agentlight.sh\" busy",
+            "async": true,
+            "timeout": 5
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "ElicitationResult": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/agentlight.sh\" busy",
+            "async": true,
+            "timeout": 5
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PreCompact": [
       {
         "hooks": [
           {
@@ -88,6 +103,19 @@
         "matcher": "AskUserQuestion"
       }
     ],
+    "Elicitation": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/agentlight.sh\" waiting",
+            "async": true,
+            "timeout": 5
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
     "Notification": [
       {
         "hooks": [
@@ -98,7 +126,43 @@
             "timeout": 5
           }
         ],
-        "matcher": "permission_prompt|elicitation_dialog"
+        "matcher": "permission_prompt|elicitation_dialog|elicitation_url_dialog|agent_needs_input"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/agentlight.sh\" done",
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/agentlight.sh\" error",
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.claude/hooks/agentlight.sh\" idle",
+            "async": true,
+            "timeout": 5
+          }
+        ]
       }
     ]
   }

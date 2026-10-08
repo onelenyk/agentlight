@@ -1,5 +1,5 @@
 #!/bin/sh
-# Хук Claude Code: шле стан агента на AgentLight. Виклик: agentlight.sh busy|waiting|done|idle
+# Хук Claude Code: шле стан агента на AgentLight. Виклик: agentlight.sh busy|waiting|done|error|idle
 # З JSON на stdin бере: session_id (agent_id, щоб паралельні сесії не затирали одна одну),
 # теку проєкту (name), запит юзера (task) і поточну дію — інструмент чи питання (message).
 # Встановлення: cp hooks/agentlight.sh ~/.claude/hooks/  (шляхи в ~/.claude/settings.json ведуть туди)
@@ -17,6 +17,9 @@ body=$(jq -c --arg state "$1" '
        elif .hook_event_name == "PermissionRequest" then "Дозвіл — " + $tool
        elif .hook_event_name == "PreToolUse" then ($in.questions[0].question // $tool)
        elif .hook_event_name == "Notification" then (.message // "")
+       elif .hook_event_name == "Elicitation" then (.message // "питання від MCP-сервера")
+       elif .hook_event_name == "StopFailure" then ("Помилка: " + (.error // "невідома"))
+       elif .hook_event_name == "PreCompact" then "стискає контекст"
        elif $state == "busy" then $tool
        else "" end | cut(100))}
   + (if .prompt then {task: (.prompt | cut(160))} else {} end)' 2>/dev/null)
