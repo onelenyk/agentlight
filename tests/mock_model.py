@@ -11,6 +11,7 @@ import json
 import threading
 import time
 
+TOOL_NAME = "Bash"         # який інструмент «модель» викликає на USE_TOOL; тест може підмінити на інший
 TOOL_INPUT = {"command": "echo canary", "description": "Print canary"}
 
 
@@ -65,7 +66,7 @@ class MockModel:
                 tool = "USE_TOOL" in all_text and not has_result and request.get("tools")
                 message = {"id": "msg_canary", "type": "message", "role": "assistant", "model": request.get("model", "mock"),
                            "content": [], "stop_reason": None, "stop_sequence": None, "usage": {"input_tokens": 1, "output_tokens": 1}}
-                block = ({"type": "tool_use", "id": "toolu_canary", "name": "Bash", "input": TOOL_INPUT} if tool
+                block = ({"type": "tool_use", "id": "toolu_canary", "name": TOOL_NAME, "input": TOOL_INPUT} if tool
                          else {"type": "text", "text": "ok"})
                 stop = "tool_use" if tool else "end_turn"
                 if not request.get("stream"):
