@@ -73,10 +73,13 @@ static void fillDebug(JsonObject o) {
     snprintf(hex, sizeof hex, "#%06x", (unsigned)(cfg.color[i] & 0xFFFFFF));
     c["colors"][STATE_NAMES[i]] = hex;
   }
+  for (int8_t i = ST_DONE; i < ST_COUNT; i++) c["anims"][STATE_NAMES[i]] = ANIM_NAMES[cfg.anim[i]];
   c["tap"] = ACTION_NAMES[cfg.tap];
   c["hold"] = ACTION_NAMES[cfg.hold];
   JsonArray acts = o["actions"].to<JsonArray>();
   for (const char* n : ACTION_NAMES) acts.add(n);
+  JsonArray anims = o["animations"].to<JsonArray>();
+  for (const char* n : ANIM_NAMES) anims.add(n);
 }
 
 static void handleStatusGet() {
@@ -106,9 +109,10 @@ static void handleDebug() {
   sendJson(200, doc);
 }
 
-static uint8_t actionFromName(const char* name, uint8_t fallback) {
-  for (uint8_t i = 0; i < ACT_COUNT; i++)
-    if (!strcmp(name, ACTION_NAMES[i])) return i;
+// Індекс назви у списку або fallback, якщо такої немає
+static uint8_t indexOf(const char* name, const char* const* names, uint8_t count, uint8_t fallback) {
+  for (uint8_t i = 0; i < count; i++)
+    if (!strcmp(name, names[i])) return i;
   return fallback;
 }
 
@@ -124,9 +128,10 @@ static void handleConfig() {
   for (int8_t i = ST_DONE; i < ST_COUNT; i++) {
     const char* hex = in["colors"][STATE_NAMES[i]] | "";
     if (strlen(hex) == 7 && hex[0] == '#') cfg.color[i] = strtoul(hex + 1, nullptr, 16);
+    cfg.anim[i] = indexOf(in["anims"][STATE_NAMES[i]] | "", ANIM_NAMES, AN_COUNT, cfg.anim[i]);
   }
-  cfg.tap = actionFromName(in["tap"] | "", cfg.tap);
-  cfg.hold = actionFromName(in["hold"] | "", cfg.hold);
+  cfg.tap = indexOf(in["tap"] | "", ACTION_NAMES, ACT_COUNT, cfg.tap);
+  cfg.hold = indexOf(in["hold"] | "", ACTION_NAMES, ACT_COUNT, cfg.hold);
   saveSettings();
   handleDebug();
 }
@@ -138,6 +143,11 @@ static void handleAction() {
   String action = in["action"] | "";
   if (action == "reboot") return restartSoon();
   if (action == "rainbow") startRainbow(10000);
+  else if (action == "preview") {   // {"action":"preview","state":"waiting"}: 6 с показує вигляд цього стану
+    uint8_t st = indexOf(in["state"] | "", STATE_NAMES, ST_COUNT, ST_IDLE);
+    if (st == ST_IDLE) return sendError(400, "unknown state");
+    startPreview((State)st, 6000);
+  }
   else if (action == "clear") clearAgents(false);
   else if (action == "unmute") muted = false;
   else if (action == "defaults") { cfg = Settings(); saveSettings(); }

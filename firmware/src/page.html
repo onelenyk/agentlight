@@ -59,6 +59,17 @@ input[type=color]{padding:2px;height:42px}
 <label>Яскравість <span id="bval"></span></label>
 <input type="range" id="bright" min="5" max="255" onchange="setBright(this.value)">
 
+<h2>Анімації</h2>
+<div class="card">
+  <div class="grid2">
+    <div><label for="a_busy">Працює</label><select id="a_busy" onchange="setAnim('busy')"></select></div>
+    <div><label for="a_waiting">Чекає на тебе</label><select id="a_waiting" onchange="setAnim('waiting')"></select></div>
+    <div><label for="a_done">Готово</label><select id="a_done" onchange="setAnim('done')"></select></div>
+    <div><label for="a_error">Помилка</label><select id="a_error" onchange="setAnim('error')"></select></div>
+  </div>
+  <small>Вибір зберігається одразу, а лампа 6 секунд показує, як це виглядає.</small>
+</div>
+
 <h2>WiFi</h2>
 <div class="card">
   <div id="wifiinfo"></div>
@@ -200,6 +211,19 @@ function saveWifi(){
   $('msg').textContent='Збережено. Девайс перезавантажується і підключається; якщо за 20 с не вийде — знову підніме точку доступу.';
 }
 function resetWifi(ssid){post('/api/wifi/reset',ssid?{ssid}:{});$('msg').textContent=(ssid?'Мережу «'+ssid+'» забуто':'Усі мережі забуто')+', девайс перезавантажується.';}
+const animLabels={solid:'рівно',breathe:'дихання',blink:'блимання',spin:'вогник по колу',comet:'комета',wave:'хвиля',heartbeat:'серцебиття',sparkle:'іскри',pendulum:'маятник',fill:'наповнення',beacon:'маячок'};
+const animStates=['busy','waiting','done','error'];
+function fillAnims(d){
+  for(const st of animStates){
+    const sel=$('a_'+st); sel.textContent='';
+    for(const a of d.animations){const o=document.createElement('option');o.value=a;o.textContent=animLabels[a]||a;sel.appendChild(o);}
+    sel.value=d.settings.anims[st];
+  }
+}
+async function setAnim(st){
+  try{await post('/api/config',{anims:{[st]:$('a_'+st).value}});await post('/api/action',{action:'preview',state:st});}catch(e){}
+}
+fetch('/api/debug').then(r=>r.json()).then(fillAnims).catch(()=>{});
 const actLabels={none:'нічого',dismiss:'побачив: гасить готово і чекає',brightness:'яскравість по колу',mute:'вимкнути / увімкнути світло'};
 const infoLabels={version:'Версія',ota_ready:'Оновлення по WiFi',uptime:'Працює',reset:'Причина запуску',build:'Прошивка зібрана',chip:'Чип',mac:'MAC',heap:'Вільна пам\'ять',heap_min:'Мінімум пам\'яті',led_pin:'Пін діодів',led_max:'Діодів, макс.',touch_pin:'Пін сенсора'};
 let cfgLoaded=false;
@@ -243,7 +267,7 @@ async function saveCfg(){
   catch(e){$('cfgmsg').textContent='Не вдалося зберегти';}
 }
 async function act(action){
-  try{const r=await post('/api/action',{action});if(action==='defaults')fillCfg(await r.json());}catch(e){}
+  try{const r=await post('/api/action',{action});if(action==='defaults'){const d=await r.json();fillCfg(d);fillAnims(d);}}catch(e){}
   refresh();
 }
 async function setOtaPass(){
