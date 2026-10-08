@@ -34,6 +34,9 @@ void fillStatus(JsonObject o) {
   o["sleep_left"] = sleepSecondsLeft();
   fillFocus(o["focus"].to<JsonObject>());
   fillGame(o["play"].to<JsonObject>());
+  JsonObject remote = o["remote"].to<JsonObject>();  // пульт: чи є кому слати клавіші
+  remote["connected"] = remoteConnected();
+  remote["bonds"] = remoteBonds();
   JsonObject sig = o["signal"].to<JsonObject>();     // дія сенсора «сигнал агентові»
   sig["count"] = signalCount;
   if (signalCount) sig["ago"] = (millis() - signalAt) / 1000;
@@ -204,6 +207,7 @@ static void handleAction() {
   else if (action == "toggle") lightSwitch(lightOff);
   else if (action == "game_tap") { games.press(millis()); games.release(millis()); }   // дотик у грі зі сторінки
   else if (action == "game_records") resetRecords();
+  else if (action == "remote_forget") remoteForget();
   else if (indexOf(action.c_str(), ACTION_NAMES, ACT_COUNT, ACT_COUNT) != ACT_COUNT) {   // будь-яка дія сенсора, зі сторінки
     uint8_t act = indexOf(action.c_str(), ACTION_NAMES, ACT_COUNT, ACT_COUNT);
     if (!actionFits(act, (Mode)cfg.mode)) return sendError(400, "action does not fit this mode");

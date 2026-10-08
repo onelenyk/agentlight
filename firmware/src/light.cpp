@@ -148,6 +148,11 @@ void render() {
     brightness = wanted;
     return;
   }
+  if (cfg.mode == MODE_MUSIC) {                                          // пульт: хвиля, коли є кому слати клавіші
+    if (lightOff) return fill(0, 0);
+    if (remoteConnected()) return showLook(MODE_COLORS[MODE_MUSIC], AN_WAVE, last);
+    return fill(MODE_COLORS[MODE_MUSIC], (last / 700) % 2 ? 0.35f : 0.05f);   // блимає: ніхто не підключений
+  }
   if (cfg.mode == MODE_GAMES) {
     if (lightOff) return fill(0, 0);
     State agents = aggregate();                                          // між раундами нагадуємо, що агент чекає

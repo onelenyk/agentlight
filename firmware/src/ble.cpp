@@ -1,8 +1,14 @@
-// Bluetooth LE: налаштування WiFi без підключення до точки доступу. Клієнт — web/setup.html у Chrome.
+// Bluetooth LE. Дві незалежні речі на одній лампі:
+//
+// 1. Налаштування WiFi без підключення до точки доступу. Клієнт — web/setup.html у Chrome; спарювання не потрібне.
 //   status (читання): стан лампи і мережі, оновлюється щосекунди
 //   scan   (читання): {"seq", "list"} — результат останнього пошуку мереж
 //   cmd    (запис):   {"cmd":"scan"} | {"cmd":"add","ssid":..,"pass":..} | {"cmd":"forget","ssid":..} | {"cmd":"forget"}
+//
+// 2. Пульт: лампа — Bluetooth-клавіатура з медіа-клавішами (HID over GATT). Її один раз спаровують у налаштуваннях
+//    системи; далі дії сенсора шлють «пауза», «наступний трек», гучність або F13–F16.
 #include <NimBLEDevice.h>
+#include <NimBLEHIDDevice.h>
 #include "app.h"
 
 #define BLE_SERVICE "a9e10001-7c1e-4b6f-9d2a-41676e744c69"
@@ -32,9 +38,56 @@ class CmdCallbacks : public NimBLECharacteristicCallbacks {
   }
 };
 
-class ServerCallbacks : public NimBLEServerCallbacks {
-  void onDisconnect(NimBLEServer*) override { NimBLEDevice::startAdvertising(); }
+// Опис звітів HID: звіт 1 — клавіатура (модифікатори + до шести клавіш), звіт 2 — одна медіа-клавіша
+static const uint8_t REPORT_MAP[] = {
+  0x05, 0x01, 0x09, 0x06, 0xA1, 0x01, 0x85, 0x01,             // Generic Desktop, Keyboard, Application, Report ID 1
+  0x05, 0x07, 0x19, 0xE0, 0x29, 0xE7, 0x15, 0x00, 0x25, 0x01, 0x75, 0x01, 0x95, 0x08, 0x81, 0x02,   // 8 модифікаторів
+  0x95, 0x01, 0x75, 0x08, 0x81, 0x01,                          // зарезервований байт
+  0x95, 0x06, 0x75, 0x08, 0x15, 0x00, 0x25, 0x73, 0x05, 0x07, 0x19, 0x00, 0x29, 0x73, 0x81, 0x00,   // 6 клавіш, коди до F24
+  0xC0,
+  0x05, 0x0C, 0x09, 0x01, 0xA1, 0x01, 0x85, 0x02,             // Consumer, Consumer Control, Application, Report ID 2
+  0x15, 0x00, 0x26, 0xFF, 0x03, 0x19, 0x00, 0x2A, 0xFF, 0x03, 0x75, 0x10, 0x95, 0x01, 0x81, 0x00,   // один 16-бітний код
+  0xC0,
 };
+static NimBLECharacteristic* keyboardReport = nullptr;
+static NimBLECharacteristic* mediaReport = nullptr;
+static volatile uint8_t secured = 0;      // скільки підключених пристроїв пройшли спарювання: їм можна слати клавіші
+
+class ServerCallbacks : public NimBLEServerCallbacks {
+  void onConnect(NimBLEServer*) override { NimBLEDevice::startAdvertising(); }   // лишаємось видимими для другого пристрою
+  void onDisconnect(NimBLEServer*, ble_gap_conn_desc* desc) override {
+    if (desc->sec_state.encrypted && secured) secured--;
+    NimBLEDevice::startAdvertising();
+  }
+  void onAuthenticationComplete(ble_gap_conn_desc* desc) override {
+    if (desc->sec_state.encrypted) secured++;
+  }
+};
+
+bool remoteConnected() { return secured > 0; }
+int  remoteBonds() { return NimBLEDevice::getNumBonds(); }
+void remoteForget() { NimBLEDevice::deleteAllBonds(); }
+
+// Натиснути й одразу відпустити: два звіти з паузою, інакше система може не помітити натискання
+void remoteMedia(uint16_t usage) {
+  if (!remoteConnected()) return;
+  uint8_t down[2] = {(uint8_t)usage, (uint8_t)(usage >> 8)}, up[2] = {0, 0};
+  mediaReport->setValue(down, sizeof down);
+  mediaReport->notify();
+  delay(20);
+  mediaReport->setValue(up, sizeof up);
+  mediaReport->notify();
+}
+
+void remoteKey(uint8_t code) {
+  if (!remoteConnected()) return;
+  uint8_t down[8] = {0, 0, code, 0, 0, 0, 0, 0}, up[8] = {};
+  keyboardReport->setValue(down, sizeof down);
+  keyboardReport->notify();
+  delay(20);
+  keyboardReport->setValue(up, sizeof up);
+  keyboardReport->notify();
+}
 
 void bleBegin() {
   NimBLEDevice::init(apName.c_str());
@@ -46,7 +99,22 @@ void bleBegin() {
   scanChar->setValue(std::string("{\"seq\":0,\"list\":[]}"));
   svc->createCharacteristic(BLE_CMD, NIMBLE_PROPERTY::WRITE)->setCallbacks(new CmdCallbacks());
   svc->start();
+
+  // Пульт. Спарювання без коду («Just Works») із запам'ятовуванням: у лампи немає ні екрана, ні клавіш для коду
+  NimBLEDevice::setSecurityAuth(true, false, true);
+  NimBLEHIDDevice* hid = new NimBLEHIDDevice(srv);
+  keyboardReport = hid->inputReport(1);
+  mediaReport = hid->inputReport(2);
+  hid->manufacturer("AgentLight");
+  hid->pnp(0x02, 0xE502, 0xA111, 0x0100);
+  hid->hidInfo(0x00, 0x01);
+  hid->reportMap((uint8_t*)REPORT_MAP, sizeof REPORT_MAP);
+  hid->startServices();
+  hid->setBatteryLevel(100);
+
   NimBLEAdvertising* adv = NimBLEDevice::getAdvertising();
+  adv->setAppearance(0x03C1);          // клавіатура: так лампу показують налаштування системи
+  adv->addServiceUUID(hid->hidService()->getUUID());
   adv->addServiceUUID(BLE_SERVICE);
   adv->setScanResponse(true);          // назва не влазить поруч із UUID сервісу, їде у відповіді на сканування
   adv->start();

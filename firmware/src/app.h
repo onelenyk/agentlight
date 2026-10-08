@@ -15,7 +15,7 @@
 #include "focus.h"
 #include "games.h"
 
-#define FW_VERSION "0.9.0"
+#define FW_VERSION "0.10.0"
 #define HOSTNAME   "agentlight"
 
 const uint8_t FRAME_MS = 25;
@@ -30,9 +30,10 @@ const uint8_t MAX_BRIGHTNESS = 255;   // без стелі: корпус на 3 
 enum State : int8_t { ST_IDLE, ST_DONE, ST_BUSY, ST_WAITING, ST_ERROR, ST_COUNT };
 extern const char* const STATE_NAMES[ST_COUNT];
 
-// Режими лампи: показувати стан агентів, просто світити, відлічувати час роботи й перерви або грати.
+// Режими лампи: показувати стан агентів, просто світити, відлічувати час роботи й перерви, грати
+// або бути Bluetooth-пультом для музики.
 // Перемикаються зі сторінки або довгим утриманням сенсора: лампа по черзі показує колір кожного режиму.
-enum Mode : uint8_t { MODE_AGENTS, MODE_LAMP, MODE_FOCUS, MODE_GAMES, MODE_COUNT };
+enum Mode : uint8_t { MODE_AGENTS, MODE_LAMP, MODE_FOCUS, MODE_GAMES, MODE_MUSIC, MODE_COUNT };
 extern const char* const MODE_NAMES[MODE_COUNT];
 extern const uint32_t    MODE_COLORS[MODE_COUNT];
 
@@ -41,6 +42,8 @@ enum Gesture : uint8_t { G_TAP, G_DOUBLE, G_HOLD, G_COUNT };
 extern const char* const GESTURE_NAMES[G_COUNT];
 enum Action : uint8_t { ACT_NONE, ACT_DISMISS, ACT_BRIGHT, ACT_TOGGLE, ACT_MODE, ACT_NEXT_ANIM, ACT_NEXT_COLOR,
                         ACT_SLEEP, ACT_SIGNAL, ACT_WEBHOOK, ACT_SPARK, ACT_FOCUS_TOGGLE, ACT_FOCUS_SKIP, ACT_FOCUS_RESET,
+                        ACT_MEDIA_PLAY, ACT_MEDIA_NEXT, ACT_MEDIA_PREV, ACT_VOLUME_UP, ACT_VOLUME_DOWN,
+                        ACT_KEY_F13, ACT_KEY_F14, ACT_KEY_F15, ACT_KEY_F16,   // клавіші, на які комп'ютер нічого не має: вішай свої команди
                         ACT_COUNT };    // нові дії — лише в кінець: номери зберігаються в налаштуваннях
 extern const char* const ACTION_NAMES[ACT_COUNT];
 bool actionFits(uint8_t action, Mode mode);     // чи має дія сенс у цьому режимі
@@ -75,9 +78,11 @@ struct Settings {
   uint8_t  focusTouch[G_COUNT] = {ACT_FOCUS_TOGGLE, ACT_FOCUS_SKIP, ACT_FOCUS_RESET};
   uint8_t  gameSel = Games::REACTION; // режим ігор: вибрана гра
   uint8_t  diceKind = Games::YES_NO;  // що показує кубик
+  uint8_t  musicTouch[G_COUNT] = {ACT_MEDIA_PLAY, ACT_MEDIA_NEXT, ACT_MEDIA_PREV};
 };
-// Ці два поля лягли в хвіст вирівнювання, тож розмір блоку той самий, що й до ігор; loadSettings() їх перевіряє.
-static_assert(sizeof(Settings) == 60, "розмір Settings змінився: онови таблицю версій у loadSettings()");
+// gameSel і diceKind лягли в хвіст вирівнювання, тож блок до ігор і після них однакового розміру (60);
+// loadSettings() ці два поля просто перевіряє на допустимість.
+static_assert(sizeof(Settings) == 64, "розмір Settings змінився: онови таблицю версій у loadSettings()");
 extern String webhookUrl;             // адреса для дії «запит на адресу»; зберігається окремо від блоку налаштувань
 void     setWebhook(const String& url);
 uint8_t& touchAction(Mode mode, Gesture gesture);
@@ -156,6 +161,11 @@ void hookBegin();                               // після apiBegin(): при
 // ---- ble ----
 void bleBegin();
 void pollBle();
+bool remoteConnected();                         // комп'ютер чи телефон підключений до лампи як до пульта
+int  remoteBonds();                             // зі скількома пристроями лампа спарована
+void remoteForget();                            // забути всі спарювання
+void remoteMedia(uint16_t usage);               // медіа-клавіша (HID Consumer): відтворення, трек, гучність
+void remoteKey(uint8_t code);                   // звичайна клавіша (HID Keyboard)
 
 // ---- ota ----
 bool otaReady();                                // пароль оновлення задано

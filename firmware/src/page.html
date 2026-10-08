@@ -68,6 +68,7 @@ dt{color:var(--mute)}dd{margin:0;overflow-wrap:anywhere}
   <button data-mode="lamp" onclick="setMode('lamp')">Лампа</button>
   <button data-mode="focus" onclick="setMode('focus')">Фокус</button>
   <button data-mode="games" onclick="setMode('games')">Ігри</button>
+  <button data-mode="music" onclick="setMode('music')">Музика</button>
 </div>
 <small style="margin:0 0 10px">На самій лампі: тримай сенсор 2 секунди — вона по черзі покаже кольори режимів; відпусти на потрібному.</small>
 
@@ -141,6 +142,26 @@ dt{color:var(--mute)}dd{margin:0;overflow-wrap:anywhere}
 
   <h2>Дотик у цьому режимі</h2>
   <div class="card" id="t_focus"></div>
+</section>
+
+<section id="p_music" hidden>
+  <h2>Пульт</h2>
+  <div class="card">
+    <div id="r_state" style="font-weight:600"></div>
+    <small id="r_help" style="margin-top:4px"></small>
+    <div class="row" style="margin-top:10px">
+      <button onclick="act('media_prev')" aria-label="Попередній трек">⏮</button>
+      <button onclick="act('media_play')" aria-label="Пауза або відтворення">⏯</button>
+      <button onclick="act('media_next')" aria-label="Наступний трек">⏭</button>
+      <button onclick="act('volume_down')" aria-label="Тихіше">🔉</button>
+      <button onclick="act('volume_up')" aria-label="Гучніше">🔊</button>
+    </div>
+    <div class="row" style="margin-top:8px"><button onclick="if(confirm('Забути всі спаровані пристрої? Потім лампу треба буде спарувати знову й видалити її зі списку Bluetooth на комп\'ютері.'))act('remote_forget')">Забути спарювання</button></div>
+    <small>Лампа працює як Bluetooth-клавіатура: керує тим, що зараз грає на спарованому комп'ютері чи телефоні. Клавіші F13–F16 самі нічого не роблять — прив'яжи до них свої команди в Shortcuts, Raycast чи налаштуваннях клавіатури.</small>
+  </div>
+
+  <h2>Дотик у цьому режимі</h2>
+  <div class="card" id="t_music"></div>
 </section>
 
 <section id="p_games" hidden>
@@ -245,7 +266,7 @@ const act=(action,extra)=>post('/api/action',Object.assign({action},extra)).then
 const dur=s=>s<60?s+' с':s<3600?Math.floor(s/60)+' хв':Math.floor(s/3600)+' год '+Math.floor(s%3600/60)+' хв';
 
 const STATES=['busy','waiting','done','error','idle'];
-const MODES=['agents','lamp','focus','games'];
+const MODES=['agents','lamp','focus','games','music'];
 const GAMES=[
   {name:'Реакція',rules:'Червоне — чекай. Щойно стане зеленим, торкнись якнайшвидше. Торкнешся зарано — фальстарт.',fmt:v=>v+' мс'},
   {name:'Стоп-вогник',rules:'Вогник біжить по колу, один діод позначений тьмяним білим. Зупини вогник саме на ньому; з кожним влучанням він швидший.',fmt:v=>'влучань: '+v},
@@ -262,7 +283,9 @@ const L={
     sparkle:'іскри',pendulum:'маятник',fill:'наповнення',beacon:'маячок',rainbow:'веселка'},
   act:{none:'нічого',dismiss:'побачив: погасити готово й чекає',brightness:'яскравість по колу',toggle:'увімкнути / вимкнути світло',
     mode:'наступний режим',animation:'наступна анімація',color:'наступний колір',sleep:'таймер сну',signal:'сигнал агентові',
-    webhook:'запит на адресу',spark:'спалах веселки',focus_toggle:'старт / пауза',focus_skip:'наступний відрізок',focus_reset:'скинути таймер'},
+    webhook:'запит на адресу',spark:'спалах веселки',focus_toggle:'старт / пауза',focus_skip:'наступний відрізок',focus_reset:'скинути таймер',
+    media_play:'музика: пауза / відтворення',media_next:'музика: наступний трек',media_prev:'музика: попередній трек',
+    volume_up:'гучніше',volume_down:'тихіше',key_f13:'клавіша F13',key_f14:'клавіша F14',key_f15:'клавіша F15',key_f16:'клавіша F16'},
   phase:{idle:'Не запущений',work:'Робота',break:'Перерва'},
   gesture:{tap:'Дотик',double:'Подвійний дотик',hold:'Утримання'},
   info:{uptime:'Працює',reset:'Причина запуску',chip:'Чип',mac:'MAC',heap:'Вільна пам\'ять',
@@ -372,6 +395,9 @@ async function tick(){
   $('f_phase').textContent=L.phase[fo.phase]+(fo.paused?' · пауза':'')+(fo.cycles?' · завершено відрізків роботи: '+fo.cycles:'');
   $('f_left').textContent=fo.phase==='idle'?clock((cfg?cfg.focus.work_min:25)*60):clock(fo.left);
   $('f_toggle').textContent=fo.phase==='idle'?'Старт':fo.paused?'Далі з паузи':'Пауза';
+  $('r_state').textContent=s.remote.connected?'Підключено: клавіші доходять':s.remote.bonds?'Спарована, але зараз ніхто не підключений':'Ще не спарована';
+  $('r_help').textContent=s.remote.connected?'':s.remote.bonds?'Увімкни Bluetooth на спарованому пристрої й піднеси його ближче.'
+    :'На комп\'ютері чи телефоні відкрий налаштування Bluetooth і підключись до '+s.wifi.ap+'. Код не потрібен.';
   const pl=s.play,gm=GAMES[pl.game];
   [...$('gamelist').children].forEach((b,i)=>b.setAttribute('aria-pressed',i===pl.game));
   $('g_rules').textContent=gm.rules;
@@ -384,8 +410,8 @@ async function tick(){
   $('s_left').textContent=s.sleep_left?'Згасне через '+dur(s.sleep_left)+'.':'';
   $('power').setAttribute('aria-pressed',!s.off);$('power').textContent=s.off?'Увімкнути':'Вимкнути';
   const focusColor=fo.phase==='break'?'#00d08a':'#ff2d55';
-  $('dot').style.background=s.off?'#000':lamp?(cfg?cfg.lamp.color:'#888'):s.mode==='focus'?focusColor:s.mode==='games'?'#0060ff':(colors[s.state]||'#333');
-  $('state').textContent=s.off?'світло вимкнене':lamp?'режим лампи':s.mode==='games'?'гра: '+GAMES[s.play.game].name.toLowerCase():s.mode==='focus'?'фокус: '+L.phase[fo.phase].toLowerCase()+(fo.phase==='idle'?'':', лишилось '+clock(fo.left))
+  $('dot').style.background=s.off?'#000':lamp?(cfg?cfg.lamp.color:'#888'):s.mode==='focus'?focusColor:s.mode==='games'?'#0060ff':s.mode==='music'?'#9000ff':(colors[s.state]||'#333');
+  $('state').textContent=s.off?'світло вимкнене':lamp?'режим лампи':s.mode==='music'?'пульт: '+(s.remote.connected?'підключено':'не підключено'):s.mode==='games'?'гра: '+GAMES[s.play.game].name.toLowerCase():s.mode==='focus'?'фокус: '+L.phase[fo.phase].toLowerCase()+(fo.phase==='idle'?'':', лишилось '+clock(fo.left))
     :(L.state[s.state]||s.state).toLowerCase();
   if(document.activeElement!==$('bright')){$('bright').value=s.brightness;$('bval').textContent=s.brightness;}
   $('l_left').textContent=s.lamp_left?'Вимкнеться через '+dur(s.lamp_left)+'.':'';

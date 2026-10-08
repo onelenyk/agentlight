@@ -61,6 +61,14 @@ void runAction(uint8_t action, const char* gesture) {
     case ACT_FOCUS_TOGGLE: focus.toggle(millis(), workMs); break;
     case ACT_FOCUS_SKIP:   focus.skip(millis(), workMs, breakMs); break;
     case ACT_FOCUS_RESET:  focus.reset(); break;
+    case ACT_MEDIA_PLAY:   remoteMedia(0xCD); break;    // коди HID Consumer
+    case ACT_MEDIA_NEXT:   remoteMedia(0xB5); break;
+    case ACT_MEDIA_PREV:   remoteMedia(0xB6); break;
+    case ACT_VOLUME_UP:    remoteMedia(0xE9); break;
+    case ACT_VOLUME_DOWN:  remoteMedia(0xEA); break;
+    case ACT_KEY_F13: case ACT_KEY_F14: case ACT_KEY_F15: case ACT_KEY_F16:
+      remoteKey(0x68 + (action - ACT_KEY_F13));          // F13 у таблиці HID Keyboard — 0x68
+      break;
   }
 }
 

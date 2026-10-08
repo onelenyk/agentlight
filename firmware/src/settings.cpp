@@ -1,11 +1,13 @@
 #include "app.h"
 
 const char* const STATE_NAMES[ST_COUNT] = {"idle", "done", "busy", "waiting", "error"};
-const char* const MODE_NAMES[MODE_COUNT] = {"agents", "lamp", "focus", "games"};
-const uint32_t    MODE_COLORS[MODE_COUNT] = {0xFF5A00, 0xFFB060, 0xFF2D55, 0x0060FF};   // такими лампа показує режими під час вибору
+const char* const MODE_NAMES[MODE_COUNT] = {"agents", "lamp", "focus", "games", "music"};
+const uint32_t    MODE_COLORS[MODE_COUNT] = {0xFF5A00, 0xFFB060, 0xFF2D55, 0x0060FF, 0x9000FF};   // такими лампа показує режими під час вибору
 const char* const GESTURE_NAMES[G_COUNT] = {"tap", "double", "hold"};
 const char* const ACTION_NAMES[ACT_COUNT] = {"none", "dismiss", "brightness", "toggle", "mode", "animation", "color",
-                                             "sleep", "signal", "webhook", "spark", "focus_toggle", "focus_skip", "focus_reset"};
+                                             "sleep", "signal", "webhook", "spark", "focus_toggle", "focus_skip", "focus_reset",
+                                             "media_play", "media_next", "media_prev", "volume_up", "volume_down",
+                                             "key_f13", "key_f14", "key_f15", "key_f16"};
 const char* const ANIM_NAMES[AN_COUNT] = {"solid", "breathe", "blink", "spin", "comet", "wave", "heartbeat", "sparkle",
                                           "pendulum", "fill", "beacon", "rainbow"};
 
@@ -24,6 +26,7 @@ bool actionFits(uint8_t action, Mode mode) {
 uint8_t& touchAction(Mode mode, Gesture gesture) {
   if (mode == MODE_LAMP) return cfg.lampTouch[gesture];
   if (mode == MODE_FOCUS) return cfg.focusTouch[gesture];
+  if (mode == MODE_MUSIC) return cfg.musicTouch[gesture];
   if (mode == MODE_GAMES) { static uint8_t fixed; fixed = ACT_NONE; return fixed; }   // в іграх жести зайняті самою грою
   return gesture == G_TAP ? cfg.tap : gesture == G_DOUBLE ? cfg.dbl : cfg.hold;
 }
@@ -50,6 +53,7 @@ void loadSettings() {
     {32, offsetof(Settings, anim)},    // до анімацій
     {36, offsetof(Settings, mode)},    // до режимів
     {48, offsetof(Settings, focusWorkMin)},   // до таймера фокусу
+    {60, offsetof(Settings, musicTouch)},     // до пульта
     {sizeof cfg, sizeof cfg},
   };
   size_t stored = prefs.isKey("cfg") ? prefs.getBytesLength("cfg") : 0;
