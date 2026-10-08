@@ -1,3 +1,6 @@
 manifold3d
 trimesh
 numpy
+# потрібні trimesh для запису плит 3MF
+networkx
+lxml
