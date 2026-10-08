@@ -121,7 +121,8 @@ static void handleHook() {
   JsonDocument in;
   in["state"] = state;
   in["agent_id"] = tool + "-" + (sid.length() ? sid.substring(0, 8) : String("x"));
-  in["name"] = baseName(field(body, {"cwd", "workspacePaths", "workspace_roots", "working_dir"}));
+  String name = baseName(field(body, {"cwd", "workspacePaths", "workspace_roots", "working_dir"}));
+  in["name"] = name.length() ? name : tool;        // без відкритої теки показуємо хоча б, який це агент
   in["message"] = message;
   if (prompt.length()) in["task"] = prompt;
   applyStatus(in);
