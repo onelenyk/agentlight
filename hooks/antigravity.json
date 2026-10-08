@@ -2,36 +2,28 @@
   "agentlight": {
     "PreInvocation": [
       {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/agy/busy >/dev/null 2>&1 & echo '{}'",
-            "timeout": 5
-          }
-        ]
+        "type": "command",
+        "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/agy/busy >/dev/null 2>&1 & echo '{}'",
+        "timeout": 5
       }
     ],
     "PostToolUse": [
       {
+        "matcher": "ask_question|ask_permission",
         "hooks": [
           {
             "type": "command",
             "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/agy/busy >/dev/null 2>&1 & echo '{}'",
             "timeout": 5
           }
-        ],
-        "matcher": "ask_question|ask_permission"
+        ]
       }
     ],
     "Stop": [
       {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/agy/stop >/dev/null 2>&1 & echo '{}'",
-            "timeout": 5
-          }
-        ]
+        "type": "command",
+        "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/agy/stop >/dev/null 2>&1 & echo '{\"decision\":\"stop\"}'",
+        "timeout": 5
       }
     ]
   }
