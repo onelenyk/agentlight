@@ -3,6 +3,7 @@
 //   light    — діоди й анімації            touch  — сенсор TTP223
 //   net      — WiFi: збережені мережі, точка доступу з порталом
 //   api      — веб-сервер, сторінка, REST  mcp    — MCP-сервер
+//   hook     — прийом хуків агентів у їхньому власному форматі
 //   ble      — налаштування WiFi по Bluetooth    ota    — оновлення прошивки по WiFi
 #pragma once
 #include <Arduino.h>
@@ -10,7 +11,7 @@
 #include <Preferences.h>
 #include <WebServer.h>
 
-#define FW_VERSION "0.5.0"
+#define FW_VERSION "0.6.0"
 #define HOSTNAME   "agentlight"
 
 const uint8_t FRAME_MS = 25;
@@ -111,6 +112,9 @@ void fillStatus(JsonObject o);
 
 // ---- mcp ----
 void handleMcp();
+
+// ---- hook ----
+void hookBegin();                               // після apiBegin(): приймає хуки агентів на /hook/<інструмент>/<стан>
 
 // ---- ble ----
 void bleBegin();

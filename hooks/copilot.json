@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "hooks": {
+    "userPromptSubmitted": [
+      {
+        "type": "command",
+        "bash": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/copilot/busy >/dev/null 2>&1 &"
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/copilot/busy >/dev/null 2>&1 &"
+      }
+    ],
+    "postToolUseFailure": [
+      {
+        "type": "command",
+        "bash": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/copilot/busy >/dev/null 2>&1 &"
+      }
+    ],
+    "notification": [
+      {
+        "type": "command",
+        "bash": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/copilot/notification >/dev/null 2>&1 &"
+      }
+    ],
+    "agentStop": [
+      {
+        "type": "command",
+        "bash": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/copilot/done >/dev/null 2>&1 &"
+      }
+    ],
+    "errorOccurred": [
+      {
+        "type": "command",
+        "bash": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/copilot/error >/dev/null 2>&1 &"
+      }
+    ],
+    "sessionEnd": [
+      {
+        "type": "command",
+        "bash": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/copilot/idle >/dev/null 2>&1 &"
+      }
+    ]
+  }
+}

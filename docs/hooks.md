@@ -1,167 +1,95 @@
 # Підключення агентів
 
-Лампа отримує стан від самого інструмента: на подіях сесії він запускає наш скрипт або плагін, а той шле запит на лампу. Модель станів і порівняння інструментів — у [agents.md](agents.md).
+Лампа сама містить усе потрібне: готові хуки для кожного агента і встановлювач. Репозиторій для підключення не потрібен.
 
-| Інструмент | Що ставити | Стан |
-|---|---|---|
-| Claude Code | `hooks/agentlight.sh` + `hooks/claude/settings.json` | перевірено на справжньому інструменті |
-| OpenCode | `hooks/opencode/agentlight.js` | перевірено на справжньому інструменті (1.18.35) |
-| Gemini CLI | `hooks/agentlight.sh` + `hooks/gemini/settings.json` | перевірено лише тестовими подіями |
-| Antigravity | `hooks/agentlight.sh` + `hooks/antigravity/hooks.json` | перевірено лише тестовими подіями |
-| Codex CLI | `hooks/agentlight.sh` + `hooks/codex/hooks.json` | перевірено лише тестовими подіями |
-| Copilot CLI | `hooks/agentlight.sh` + `hooks/copilot/agentlight.json` | перевірено лише тестовими подіями |
-| Qwen Code | `hooks/agentlight.sh` + `hooks/qwen/settings.json` | перевірено лише тестовими подіями |
-| Cursor | `hooks/agentlight.sh` + `hooks/cursor/hooks.json` | перевірено лише тестовими подіями |
-| Kilo Code | `hooks/opencode/agentlight.js` (ті самі назви подій) | не перевірено |
+## Одна команда
 
-«Тестовими подіями» означає: скриптові подано зразок JSON у форматі цього інструмента, і лампа показала правильний стан. Чи сам інструмент викличе хук саме так, як описано в його документації, не перевірено.
-
-## Скрипт
-
-`hooks/agentlight.sh <стан> [інструмент]` — один на всі інструменти з хуками-командами. Потрібні `jq` і `curl`.
-
-- **Стан:** `busy`, `waiting`, `done`, `error`, `idle`. Є два псевдостани, які скрипт сам перетворює за вмістом події: `stop` (кінець ходу з причиною — Cursor, Antigravity) і `notification` (стає `waiting` лише для запиту дозволу чи питання, решта сповіщень ігнорується).
-- **Інструмент:** `claude` (типово), `codex`, `gemini`, `agy`, `cursor`, `copilot`, `qwen`. Іде в `agent_id`: `claude-1a2b3c4d`, `codex-…`. Для `gemini` і `agy` скрипт ще друкує `{}`, бо вони чекають JSON у відповідь.
-- **Що шле:** `agent_id` (інструмент і перші 8 символів ідентифікатора сесії, тож паралельні сесії не затирають одна одну), назву теки проєкту, запит користувача й поточну дію.
-- **Агента не гальмує:** запит іде у фоні з обмеженням 2 с; якщо лампа вимкнена, нічого не станеться.
-
-Встановлення скрипта для всіх інструментів, крім Claude Code:
+На сторінці лампи: «Підключення агентів» → вибрати агента → скопіювати команду. Вона виглядає так:
 
 ```sh
-mkdir -p ~/.agentlight
-cp hooks/agentlight.sh ~/.agentlight/ && chmod +x ~/.agentlight/agentlight.sh
+curl -4 -fsS http://agentlight.local/install.sh | sh -s -- claude
 ```
 
-Адресу лампи (типово `agentlight.local`) міняє змінна середовища:
+Замість `claude` — `opencode`, `codex`, `gemini`, `antigravity`, `copilot`, `qwen` або `cursor`. Команду можна виконати самому в терміналі або дати агентові й попросити виконати. Після цього агента треба перезапустити.
+
+Що робить встановлювач:
+
+- завантажує з лампи хуки для вибраного агента;
+- дописує їх до його налаштувань, не чіпаючи чужих хуків; повторний запуск замінює свої старі записи, а не дублює;
+- попередню версію файлу лишає поруч як `*.bak-agentlight-<час>`.
+
+Що потрібно на комп'ютері: `curl` і, якщо в агента вже є налаштування, `python3` або `node` для їх об'єднання. Без них встановлювач нічого не змінює і показує, який файл додати вручну. Windows без WSL не підтримується.
+
+| Агент | Куди ставиться |
+|---|---|
+| Claude Code | `~/.claude/settings.json` |
+| OpenCode | `~/.config/opencode/plugins/agentlight.js` |
+| Codex CLI | `~/.codex/hooks.json` |
+| Gemini CLI | `~/.gemini/settings.json` |
+| Antigravity | `~/.gemini/config/hooks.json` |
+| Copilot CLI | `~/.copilot/hooks/agentlight.json` |
+| Qwen Code | `~/.qwen/settings.json` |
+| Cursor | `~/.cursor/hooks.json` |
+
+## Як це влаштовано
+
+Хук — це один виклик `curl`: він бере перші 4 КБ події агента і шле їх лампі як є.
 
 ```sh
-export AGENTLIGHT_HOST=192.168.1.50
+d=$(head -c 4000); printf %s "$d" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' \
+  --data-binary @- http://agentlight.local/hook/claude/busy >/dev/null 2>&1 &
 ```
 
-Файли з теки `hooks/<інструмент>/` — це лише розділ хуків. Якщо у твоєму файлі налаштувань уже є хуки на ті самі події, дописуй наші в наявні масиви, а не заміняй їх.
+Лампа сама дістає з події сесію, теку проєкту, запит і поточну дію (`firmware/src/hook.cpp`). Тому на комп'ютері немає ні скриптів, ні `jq`, а запит іде у фоні з обмеженням 2 секунди й агента не гальмує.
 
-## Claude Code
+Адреса запиту: `/hook/<агент>/<стан>`. Стан — `busy`, `waiting`, `done`, `error`, `idle` або псевдостан, який лампа уточнює за вмістом події:
 
-```sh
-mkdir -p ~/.claude/hooks
-cp hooks/agentlight.sh ~/.claude/hooks/ && chmod +x ~/.claude/hooks/agentlight.sh
-```
+- `stop` — кінець ходу з причиною (Cursor, Antigravity): успіх, помилка, переривання або «фонові задачі ще йдуть»;
+- `notification` — сповіщення: «чекає» лише для запиту дозволу чи питання, решта ігнорується.
 
-Вміст `hooks/claude/settings.json` додай у розділ `hooks` файлу `~/.claude/settings.json`.
+OpenCode підключається інакше — плагіном, який працює всередині нього і шле стан на `/api/status`.
 
-| Стан | Події |
+Хуки звертаються до лампи за іменем `agentlight.local`. Якщо в мережі воно не працює (частина Linux-систем без mDNS), заміни його у встановленому файлі на IP-адресу лампи.
+
+## Які події який стан дають
+
+| Агент | працює | чекає | готово | помилка | спокій |
+|---|---|---|---|---|---|
+| Claude Code | UserPromptSubmit, PostToolUse, PostToolUseFailure, PermissionDenied, ElicitationResult, PreCompact | PermissionRequest, PreToolUse (AskUserQuestion), Elicitation, Notification | Stop | StopFailure | SessionEnd |
+| OpenCode | chat.message, tool.execute.before, session.status, permission.replied | permission.asked, question.asked | session.status idle | session.error | session.deleted, переривання |
+| Codex CLI | UserPromptSubmit, PostToolUse | PermissionRequest | Stop | — | Interrupt, SessionEnd |
+| Gemini CLI | BeforeAgent, BeforeTool | Notification | AfterAgent | — | SessionEnd |
+| Antigravity | PreInvocation | — | Stop | Stop з помилкою | — |
+| Copilot CLI | userPromptSubmitted, postToolUse, postToolUseFailure | notification | agentStop | errorOccurred | sessionEnd |
+| Qwen Code | UserPromptSubmit, PostToolUse, PostToolUseFailure, PermissionDenied | PermissionRequest, Notification | Stop | StopFailure | SessionEnd |
+| Cursor | beforeSubmitPrompt, postToolUse, postToolUseFailure | — | stop | stop з помилкою | sessionEnd, переривання |
+
+## Що перевірено
+
+| Агент | Стан перевірки |
 |---|---|
-| працює | UserPromptSubmit, PostToolUse, PostToolUseFailure, PermissionDenied, ElicitationResult, PreCompact |
-| чекає | PermissionRequest, PreToolUse (AskUserQuestion), Elicitation, Notification (дозвіл, питання, фонова сесія чекає) |
-| готово | Stop |
-| помилка | StopFailure |
-| спокій | SessionEnd |
+| Claude Code | працює в роботі: хуки встановлені встановлювачем із лампи, лампа показує сесію з поточною дією |
+| OpenCode | «працює» і «готово» перевірені на справжньому OpenCode; запит дозволу, питання, помилка й переривання — ні |
+| Codex, Cursor, Copilot CLI, Antigravity | лише тестовими подіями у форматі кожного агента |
+| Gemini CLI, Qwen Code | не перевірено: лише те, що встановлювач кладе коректний файл |
 
-Хуки запускаються у фоні (`async`) з обмеженням 5 с.
+Встановлювач для всіх восьми агентів перевірений у порожній домашній теці: файли лягають на місця, чужі хуки зберігаються, повторний запуск нічого не дублює.
 
-## OpenCode
+Відомі особливості:
 
-```sh
-mkdir -p ~/.config/opencode/plugins
-cp hooks/opencode/agentlight.js ~/.config/opencode/plugins/
-```
+- **OpenCode з плагіном oh-my-openagent сам запускає хуки Claude Code**, але без події завершення. Лампа такі виклики пропускає (сесії з ідентифікатором `ses_…`); їх веде плагін OpenCode.
+- **Antigravity не має стану «чекає».** Єдиний спосіб його зловити — хук перед інструментом, а він мусить повертати рішення про дозвіл, і з документації незрозуміло, яке безпечне.
+- **Cursor** за документацією сам імпортує хуки з `~/.claude/settings.json`; тоді сесії Cursor з'являться на лампі як сесії Claude Code, і окремі хуки Cursor дадуть дублі.
 
-Для одного проєкту — у `.opencode/plugins/`. Плагін працює всередині OpenCode, скрипт і `jq` не потрібні.
-
-| Стан | Події |
-|---|---|
-| працює | `chat.message`, `session.status` (busy, retry), `tool.execute.before`, `permission.replied`, `question.replied`, `question.rejected`, стискання контексту |
-| чекає | `permission.asked`, `question.asked` |
-| готово | `session.status` idle, якщо в цьому ході не було помилки |
-| помилка | `session.error`, крім двох випадків нижче |
-| спокій | `session.deleted`; `session.error` з `MessageAbortedError` — користувач перервав |
-
-Що перевірено на OpenCode 1.18.35 командою `opencode run`: лампа показала «працює» з текстом запиту й назвою інструмента, потім «готово»; назва проєкту й окремий `agent_id` на сесію правильні. Не перевірено: запит дозволу, питання, помилка, переривання, підагенти — для них у неінтерактивному запуску не було нагоди.
-
-Особливості:
-
-- **`ContextOverflowError` не вважається помилкою:** після неї OpenCode зазвичай сам стискає контекст і продовжує.
-- **Сесії підагентів ігноруються** (за `parentID`), інакше лампа блимала б «готово» посеред ходу.
-- **Закриття OpenCode події не дає:** лампа лишиться на «готово», доки не спливе час цього стану.
-- **OpenCode з плагіном oh-my-openagent сам запускає хуки Claude Code** з `~/.claude/settings.json`, але без події завершення — раніше це лишало на лампі завислу сесію «працює». Тепер `agentlight.sh` такі виклики пропускає (ідентифікатор сесії починається з `ses_`), а стан веде плагін.
-- **`opencode run` у скриптах запускай із `</dev/null`:** без цього він чекає на stdin і не завершується. До лампи це стосунку не має.
-
-## Gemini CLI
-
-Розділ `hooks` з `hooks/gemini/settings.json` додай у `~/.gemini/settings.json`.
-
-| Стан | Події |
-|---|---|
-| працює | BeforeAgent, BeforeTool |
-| чекає | Notification (`ToolPermission`) |
-| готово | AfterAgent |
-| спокій | SessionEnd |
-
-Події про помилку ходу Gemini CLI не має. На справжньому інструменті не перевірено: з червня 2026 він працює лише з платними API-ключами.
-
-## Antigravity
-
-`hooks/antigravity/hooks.json` поклади як `~/.gemini/config/hooks.json` (усі проєкти) або `.agents/hooks.json` (один проєкт). Якщо такий файл уже є, додай у нього наш ключ `agentlight`. Хуки спільні для IDE, застосунку Antigravity 2.0 і CLI `agy`.
-
-| Стан | Події |
-|---|---|
-| працює | PreInvocation; PostToolUse для `ask_question` і `ask_permission`; Stop із `fullyIdle: false` |
-| готово | Stop, `terminationReason: "model_stop"` |
-| помилка | Stop з іншою причиною або з полем `error` |
-
-Стану «чекає» немає: хук `PreToolUse` в Antigravity мусить повернути рішення про дозвіл, і невідомо, яке з них не змінить поведінку агента, тож ми його не чіпаємо. Подій початку й кінця сесії та тексту запиту Antigravity не дає. На справжньому інструменті не перевірено: агент IDE запускається лише з вікна програми.
-
-## Codex CLI
-
-Вміст `hooks/codex/hooks.json` додай у `~/.codex/hooks.json`.
-
-| Стан | Події |
-|---|---|
-| працює | UserPromptSubmit, PostToolUse |
-| чекає | PermissionRequest |
-| готово | Stop |
-| спокій | Interrupt, SessionEnd |
-
-Окремої події про помилку немає.
-
-## Copilot CLI
-
-`hooks/copilot/agentlight.json` поклади в `~/.copilot/hooks/`.
-
-| Стан | Події |
-|---|---|
-| працює | userPromptSubmitted, postToolUse, postToolUseFailure |
-| чекає | notification (`permission_prompt`, `elicitation_dialog`) |
-| готово | agentStop |
-| помилка | errorOccurred |
-| спокій | sessionEnd |
-
-## Qwen Code
-
-Розділ `hooks` з `hooks/qwen/settings.json` додай у `~/.qwen/settings.json`. Події ті самі, що в Claude Code, включно з `StopFailure` для помилки.
-
-## Cursor
-
-Вміст `hooks/cursor/hooks.json` додай у `~/.cursor/hooks.json`.
-
-| Стан | Події |
-|---|---|
-| працює | beforeSubmitPrompt, postToolUse, postToolUseFailure |
-| готово | stop зі статусом `completed` |
-| помилка | stop зі статусом `error` |
-| спокій | stop зі статусом `aborted`, sessionEnd |
-
-Події очікування дозволу Cursor не має.
-
-За документацією Cursor типово сам імпортує хуки з `~/.claude/settings.json` (Settings → Agents → Third-Party Imports). Тоді хуки Claude Code спрацюють і в ньому, і одна розмова з'явиться на лампі двічі: як `claude-…` і як `cursor-…`. Щоб цього не було, або вимкни цей імпорт у Cursor, або не став `hooks/cursor/hooks.json` і покладайся на імпортовані хуки (тоді не буде розрізнення «готово» і «помилка»). Не перевірено: Cursor на цій машині не встановлений.
-
-## Перевірка без інструмента
+## Перевірка без агента
 
 ```sh
 echo '{"session_id":"test1234","cwd":"/tmp/demo","hook_event_name":"UserPromptSubmit","prompt":"привіт"}' \
-  | ~/.agentlight/agentlight.sh busy codex
+  | curl -4 -s -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/claude/busy
 ```
 
-Лампа має засвітитись як «працює», а на її сторінці з'явиться картка `demo` з агентом `codex-test1234`. Прибрати її: `curl -4 -X POST 'http://agentlight.local/api/status?state=idle&agent_id=codex-test1234'`.
+Лампа має показати «працює», а на її сторінці з'явиться картка `demo`.
 
-Щоб побачити запит і нічого не слати, додай `AGENTLIGHT_DRY_RUN=1` перед командою.
+## Звідки файли
+
+Джерело — тека `hooks/` репозиторію: по одному файлу на агента і `install.sh`. Під час збірки прошивки `firmware/tools/embed_assets.py` пакує їх у прошивку, і лампа роздає їх за адресами `/setup/<файл>` та `/install.sh`.

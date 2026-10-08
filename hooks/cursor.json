@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeSubmitPrompt": [
+      {
+        "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/cursor/busy >/dev/null 2>&1 &"
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/cursor/busy >/dev/null 2>&1 &"
+      }
+    ],
+    "postToolUseFailure": [
+      {
+        "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/cursor/busy >/dev/null 2>&1 &"
+      }
+    ],
+    "stop": [
+      {
+        "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/cursor/stop >/dev/null 2>&1 &"
+      }
+    ],
+    "sessionEnd": [
+      {
+        "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/cursor/idle >/dev/null 2>&1 &"
+      }
+    ]
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/qwen/busy >/dev/null 2>&1 &"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/qwen/busy >/dev/null 2>&1 &"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/qwen/busy >/dev/null 2>&1 &"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/qwen/busy >/dev/null 2>&1 &"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/qwen/waiting >/dev/null 2>&1 &"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/qwen/notification >/dev/null 2>&1 &"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/qwen/done >/dev/null 2>&1 &"
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/qwen/error >/dev/null 2>&1 &"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/qwen/idle >/dev/null 2>&1 &"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -21,7 +21,7 @@ curl -4 -X POST http://agentlight.local/api/status -H 'Content-Type: application
 
 ## Claude Code — підтримується
 
-Хуки з `hooks/claude/settings.json` викликають `hooks/agentlight.sh <стан>`.
+Хуки з `hooks/claude.json` шлють кожну подію лампі на `/hook/claude/<стан>`; встановлення — у [hooks.md](hooks.md).
 
 | Стан | Події |
 |---|---|

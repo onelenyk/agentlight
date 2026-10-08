@@ -21,7 +21,7 @@
 |---|---|---|
 | [`firmware/`](firmware/) | прошивка (PlatformIO, Arduino) і тестова прошивка для перевірки пайки | [docs/firmware.md](docs/firmware.md) |
 | [`case/`](case/) | параметрична модель корпусу, перевірка, файли до друку, 3D-превью | [docs/case.md](docs/case.md) |
-| [`hooks/`](hooks/) | хук Claude Code, який шле стан сесії на лампу | [docs/hooks.md](docs/hooks.md) |
+| [`hooks/`](hooks/) | хуки для Claude Code, OpenCode, Codex та інших агентів і встановлювач; лампа роздає їх сама | [docs/hooks.md](docs/hooks.md) |
 | [`web/`](web/) | сайт: налаштування WiFi по Bluetooth і вхід до 3D-превью; локальний сервер | [docs/site.md](docs/site.md) |
 | [`docs/`](docs/) | компоненти, схема підключення, складання | [docs/bom.md](docs/bom.md), [docs/wiring.md](docs/wiring.md) |
 
@@ -34,7 +34,7 @@
 3. **Спаяти** — [схема й порядок пайки](docs/wiring.md).
 4. **Прошити** — `cd firmware && pio run -t upload`: [прошивка](docs/firmware.md).
 5. **Підключити до WiFi** — по Bluetooth зі сторінки `web/setup.html` або через точку доступу лампи: [сайт](docs/site.md).
-6. **Під'єднати агента** — [хуки Claude Code](docs/hooks.md) або MCP.
+6. **Під'єднати агента** — одна команда зі сторінки лампи: [підключення агентів](docs/hooks.md).
 
 ![Схема підключення](docs/images/wiring.png)
 

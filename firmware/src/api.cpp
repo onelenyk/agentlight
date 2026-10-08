@@ -1,7 +1,8 @@
 // Веб-сервер: сторінка лампи і REST. Опис запитів — у docs/firmware.md.
 #include <WiFi.h>
 #include "app.h"
-#include "page_gz.h"
+#include <uri/UriBraces.h>
+#include "assets.h"
 
 WebServer server(80);
 
@@ -217,6 +218,20 @@ void apiBegin() {
     server.sendHeader("Content-Encoding", "gzip");
     server.send_P(200, "text/html", (const char*)PAGE_GZ, PAGE_GZ_LEN);
   });
+  // Усе, щоб підключити агента без жодних файлів на руках: встановлювач і готові хуки
+  server.on("/install.sh", HTTP_GET, [] {
+    String script = "LAMP='http://" + WiFi.localIP().toString() + "'\n";
+    script.concat((const char*)INSTALL_SH, INSTALL_SH_LEN);
+    server.send(200, "text/plain; charset=utf-8", script);
+  });
+  server.on(UriBraces("/setup/{}"), HTTP_GET, [] {
+    for (auto& f : SETUP_FILES) {
+      if (server.pathArg(0) != f.name) continue;
+      server.sendHeader("Content-Encoding", "gzip");
+      return server.send_P(200, f.type, (const char*)f.data, f.len);
+    }
+    server.send(404, "text/plain", "Not found");
+  });
   server.on("/api/status", HTTP_GET, handleStatusGet);
   server.on("/api/status", HTTP_POST, handleStatusPost);
   server.on("/api/config", HTTP_POST, handleConfig);
@@ -233,5 +248,6 @@ void apiBegin() {
     server.send(302, "text/plain", "");
   });
   otaBegin();
+  hookBegin();
   server.begin();
 }
