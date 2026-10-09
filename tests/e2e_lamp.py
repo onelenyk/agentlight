@@ -685,6 +685,8 @@ if wanted("modes"):
         time.sleep(1)
         down = volume()
         sh(f"osascript -e 'set volume output volume {before}'")
+        if (start, up, down) == (start, start, start) and len(remote["devices"]) > 1:
+            raise Skip("активний зараз інший пристрій, не цей Mac; хто отримує клавіші, перевіряє наступна перевірка")
         assert up > start and down < up, (start, up, down)
         return f"гучність {start} → {up} → {down}, потім повернув {before}"
 
@@ -843,6 +845,7 @@ if wanted("ota"):
         assert result.returncode == 0, result.stdout[-400:]
         return next(line for line in sh(f"strings {BIN}").stdout.splitlines() if " 2026 " in line and line.count(":") == 2)
 
+    OTA_PASSWORD = "e2e-check-password"      # сталий: якщо перевірка впаде посередині, його можна зняти вручну
     can = KEY.exists() and shutil.which("pio")
     bench = call("/api/allow/touch?yes=0", b"", raw=True)[0] != 404
 
@@ -905,7 +908,7 @@ if wanted("ota"):
     def _():
         if not can:
             raise Skip("немає ключа підпису або PlatformIO")
-        password = "e2e-pass-" + os.urandom(3).hex()
+        password = OTA_PASSWORD
         assert call("/api/ota/password", {"new": "abc"})["error"] == "password too short"
         assert call("/api/ota/password", {"new": password}) == {"ok": True}
         assert call("/api/ota/password", {"new": "another-pass"})["error"] == "wrong password"
@@ -924,14 +927,24 @@ if wanted("ota"):
             raise Skip("попередня перевірка не пройшла")
         wrong = sh(f"cd {FIRMWARE} && AGENTLIGHT_OTA_PASSWORD=wrong pio run -e ota -t upload --upload-port {args.lamp}", timeout=600)
         assert "Authentication Failed" in wrong.stdout + wrong.stderr
-        good = sh(f"cd {FIRMWARE} && PLATFORMIO_BUILD_FLAGS='-DE2E_BUILD=3' AGENTLIGHT_OTA_PASSWORD={ota_password} pio run -e ota -t upload --upload-port {args.lamp}", timeout=600)  # noqa: F821
+        for attempt in (1, 2):                 # одразу після відхиленої спроби лампа інколи ще не готова прийняти нову
+            good = sh(f"cd {FIRMWARE} && PLATFORMIO_BUILD_FLAGS='-DE2E_BUILD=3' AGENTLIGHT_OTA_PASSWORD={ota_password} pio run -e ota -t upload --upload-port {args.lamp}", timeout=600)  # noqa: F821
+            if "Result: OK" in good.stdout + good.stderr:
+                break
+            time.sleep(10)
+            wait_online()
         assert "Result: OK" in good.stdout + good.stderr, (good.stdout + good.stderr)[-300:]
         time.sleep(8)
         wait_online()
         stamp = next(line for line in sh(f"strings {FIRMWARE / '.pio/build/ota/firmware.bin'}").stdout.splitlines() if " 2026 " in line and line.count(":") == 2)
         assert debug()["device"]["build"] == stamp
         assert call("/api/ota/password", {"old": ota_password, "new": ""}) == {"ok": True} and debug()["device"]["ota_ready"] is False  # noqa: F821
-        return f"збірка {stamp}"
+        return f"збірка {stamp}" + (" (з другої спроби)" if attempt == 2 else "")
+
+    @check("пароль перевірки знято з лампи")
+    def _():
+        call("/api/ota/password", {"old": OTA_PASSWORD, "new": ""})
+        assert debug()["device"]["ota_ready"] is False, "на лампі лишився пароль оновлення"
 
     @check("наприкінці на лампі — опублікована прошивка з GitHub")
     def _():

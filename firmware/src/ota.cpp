@@ -109,6 +109,11 @@ static void handleUploadDone() {
 }
 
 void otaBegin() {
+#ifdef OTA_FORGET_PASSWORD
+  // Порятунок, якщо пароль оновлення забуто: підписана збірка з цим прапорцем знімає його при запуску.
+  // Зібрати й підписати таку може лише власник ключа підпису, тож чужий так пароль не скине.
+  prefs.remove("otapass");
+#endif
   if (prefs.isKey("otapass")) password = prefs.getString("otapass");
   static const char* headers[] = {"X-OTA-Password", "X-Signature"};
   server.collectHeaders(headers, 2);
