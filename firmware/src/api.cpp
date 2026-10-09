@@ -34,6 +34,7 @@ void fillStatus(JsonObject o) {
   o["sleep_left"] = sleepSecondsLeft();
   fillFocus(o["focus"].to<JsonObject>());
   fillGame(o["play"].to<JsonObject>());
+  fillAllow(o["allow"].to<JsonObject>());
   JsonObject remote = o["remote"].to<JsonObject>();  // пульт: чи є кому слати клавіші
   remote["connected"] = remoteConnected();
   remote["bonds"] = remoteBonds();
@@ -167,6 +168,12 @@ static void handleConfig() {
     cfg.lampOffMin = constrain(in["lamp"]["off_min"] | (int)cfg.lampOffMin, 0, 1440);
     lightSwitch(true);                  // зміну видно одразу, таймер рахує заново
   }
+  if (in["allow"].is<JsonObjectConst>()) {
+    JsonObjectConst a = in["allow"];
+    cfg.allowEnabled = a["enabled"] | (bool)cfg.allowEnabled;
+    cfg.allowCats = ((a["edits"] | (bool)(cfg.allowCats & 1)) ? 1 : 0) | ((a["commands"] | (bool)(cfg.allowCats & 2)) ? 2 : 0)
+                  | ((a["other"] | (bool)(cfg.allowCats & 4)) ? 4 : 0);
+  }
   cfg.diceKind = constrain(in["dice"] | (int)cfg.diceKind, 0, Games::DICE_COUNT - 1);
   if (in["game"].is<int>()) {
     cfg.gameSel = constrain(in["game"].as<int>(), 0, Games::GAME_COUNT - 1);
@@ -282,5 +289,6 @@ void apiBegin() {
   });
   otaBegin();
   hookBegin();
+  allowBegin();
   server.begin();
 }

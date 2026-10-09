@@ -1,7 +1,7 @@
 """Перед збіркою пакує в src/assets.h усе, що лампа роздає сама:
 
   src/page.html          -> сторінка лампи (gzip, 20 КБ -> ~8 КБ)
-  ../hooks/*.json, *.js  -> готові хуки агентів, GET /setup/<файл> (gzip)
+  ../hooks/*.json, *.js  -> готові хуки агентів і allow.sh, GET /setup/<файл> (gzip)
   ../hooks/install.sh    -> встановлювач, GET /install.sh (без стиснення: лампа дописує до нього свою адресу)
   update_public_key.pem  -> відкритий ключ, яким лампа перевіряє підпис прошивки при оновленні
 
@@ -14,7 +14,7 @@ Import("env")  # noqa: F821 — надає PlatformIO
 
 src = pathlib.Path(env.subst("$PROJECT_SRC_DIR"))  # noqa: F821
 hooks = src.parent.parent / "hooks"
-TYPES = {".json": "application/json", ".js": "text/javascript"}
+TYPES = {".json": "application/json", ".js": "text/javascript", ".sh": "text/plain; charset=utf-8"}
 
 
 def array(name, data):
@@ -33,7 +33,7 @@ key = (src.parent / "update_public_key.pem").read_text().strip()
 text += "\nconst char UPDATE_PUBLIC_KEY[] = \n" + "\n".join(f'  "{line}\\n"' for line in key.splitlines()) + ";\n\n"
 
 entries = []
-for i, f in enumerate(sorted(p for p in hooks.iterdir() if p.suffix in TYPES)):
+for i, f in enumerate(sorted(p for p in hooks.iterdir() if p.suffix in TYPES and p.name != "install.sh")):
     data = gzip.compress(f.read_bytes(), 9, mtime=0)
     text += array(f"SETUP_{i}", data)
     entries.append(f'  {{"{f.name}", "{TYPES[f.suffix]}", SETUP_{i}, {len(data)}}},')

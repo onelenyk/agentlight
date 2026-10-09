@@ -14,6 +14,7 @@ using std::string;
 struct Event {
   bool   skip = false;                // подію треба проігнорувати
   string state, agentId, name, message, task;
+  string tool, command;               // для запиту дозволу: назва інструмента і команда чи файл цілком
 };
 
 // Позиція одразу після двокрапки ключа key, починаючи з from; -1, якщо ключа немає
@@ -114,6 +115,11 @@ inline Event parse(const string& tool, string state, const string& body) {
     if (what.empty()) what = field(body, {"pattern", "command"}, inputAt);
   }
   string toolText = !toolName.empty() && !what.empty() ? toolName + ": " + what : toolName + what;
+  ev.tool = toolName;
+  if (inputAt >= 0) {
+    int commandAt = after(body, "command", inputAt), fileAt = after(body, "file_path", inputAt);
+    ev.command = readString(body, commandAt >= 0 ? commandAt : fileAt, 3000);
+  }
 
   if (state == "stop") {
     int idleAt = after(body, "fullyIdle");

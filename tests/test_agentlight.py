@@ -5,7 +5,8 @@
   InstallerTests   — hooks/install.sh проти імітації лампи в порожній домашній теці
   EndToEndTests    — встановлений хук, запущений як його запустив би агент, доходить до лампи
   ReleaseTests     — підпис прошивки й файл latest.json, з якого сторінка лампи бере оновлення
-  LogicTests       — жести сенсора й таймер фокусу (tests/logic_test.cpp, той самий код, що в прошивці)
+  LogicTests       — жести сенсора, таймер фокусу, ігри, правила «Дозволити» (tests/logic_test.cpp, код із прошивки)
+  AllowTests       — «Дозволити»: спарювання встановлювачем і хук, що питає лампу й перевіряє її підпис
 
 Запуск:  python3 -m unittest discover -s tests -v
 Потрібні: python3, компілятор C++ (c++), curl, openssl; для одного тесту — node.
@@ -389,6 +390,119 @@ class ReleaseTests(unittest.TestCase):
         self.assertIn("const UPDATE_URL='https://onelenyk.github.io/agentlight/firmware/'", page)
         workflow = (TESTS.parent / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
         self.assertIn("--out _site/firmware", workflow)
+
+
+class AllowTests(unittest.TestCase):
+    """Комп'ютерний бік «Дозволити» проти імітації лампи. Головне тут — коли хук НЕ має нічого дозволяти."""
+    EVENT = {"session_id": "abcdef12-3456", "cwd": "/home/u/proj", "hook_event_name": "PermissionRequest",
+             "tool_name": "Bash", "tool_input": {"command": "npm test", "description": "Run tests"}}
+
+    def setUp(self):
+        self.lamp = MockLamp().__enter__()
+        self.addCleanup(self.lamp.__exit__)
+        self.home = pathlib.Path(tempfile.mkdtemp(prefix="agentlight-allow-"))
+        self.addCleanup(shutil.rmtree, self.home, True)
+        self.env = dict(os.environ, HOME=str(self.home), AGENTLIGHT_HOST=self.lamp.host)
+
+    def install(self, *args):
+        return subprocess.run(f"curl -4 -fsS {self.lamp.url}/install.sh | sh -s -- {' '.join(args)}", shell=True, env=self.env,
+                              capture_output=True, text=True)
+
+    def hook(self, event=None):
+        result = subprocess.run([str(self.home / ".agentlight" / "allow.sh"), "claude"], input=json.dumps(event or self.EVENT),
+                                env=self.env, capture_output=True, text=True, timeout=40)
+        self.assertEqual(result.returncode, 0)
+        return result.stdout.strip()
+
+    def paired(self):
+        result = self.install("claude", "allow")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_pairing_installs_everything_and_keeps_the_secret_private(self):
+        self.paired()
+        conf = self.home / ".agentlight" / "allow.conf"
+        values = dict(line.split("=", 1) for line in conf.read_text().split())
+        self.assertEqual(values["HOST"], self.lamp.host)
+        self.assertEqual(self.lamp.keys[values["KEY"]], values["SECRET"])
+        self.assertEqual(len(values["SECRET"]), 32)
+        self.assertEqual(conf.stat().st_mode & 0o077, 0, "секрет мають читати лише власник")
+        self.assertTrue(os.access(self.home / ".agentlight" / "allow.sh", os.X_OK))
+        entries = json.loads((self.home / ".claude" / "settings.json").read_text())["hooks"]["PermissionRequest"]
+        self.assertEqual([("allow.sh" in e["hooks"][0]["command"], e["hooks"][0].get("async", False)) for e in entries],
+                         [(False, True), (True, False)], "хук рішення має бути синхронним, сповіщення — фоновим")
+
+    def test_rejected_or_ignored_pairing_changes_nothing(self):
+        for answer in ("rejected", "expired"):
+            self.lamp.pair_answer = answer
+            result = self.install("claude", "allow")
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse((self.home / ".agentlight" / "allow.conf").exists())
+            self.assertFalse((self.home / ".claude" / "settings.json").exists())
+
+    def test_allow_is_only_for_agents_that_support_it(self):
+        result = self.install("gemini", "allow")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(self.lamp.keys, {})
+
+    def test_plain_install_removes_the_allow_hook(self):
+        self.paired()
+        self.assertEqual(self.install("claude").returncode, 0)
+        entries = json.loads((self.home / ".claude" / "settings.json").read_text())["hooks"]["PermissionRequest"]
+        self.assertFalse(any("allow.sh" in e["hooks"][0]["command"] for e in entries))
+
+    def test_touch_allows_and_hold_denies(self):
+        self.paired()
+        self.assertEqual(json.loads(self.hook())["hookSpecificOutput"]["decision"], {"behavior": "allow"})
+        self.assertIn('"command": "npm test"', self.lamp.asks[0]["raw"])
+        self.assertEqual(self.lamp.asks[0]["agent_id"], "claude-abcdef12")
+        self.lamp.allow_answer = "deny"
+        decision = json.loads(self.hook())["hookSpecificOutput"]
+        self.assertEqual((decision["hookEventName"], decision["decision"]["behavior"]), ("PermissionRequest", "deny"))
+        self.assertNotEqual(self.lamp.asks[0]["nonce"], self.lamp.asks[1]["nonce"], "кожен запит має свій одноразовий номер")
+
+    def test_no_decision_when_the_lamp_does_not_decide(self):
+        self.paired()
+        for reason in ("disabled", "dangerous", "category", "busy", "too long"):
+            self.lamp.refuse = reason
+            self.assertEqual(self.hook(), "", reason)
+        self.lamp.refuse = None
+        self.lamp.allow_answer = "expired"
+        self.assertEqual(self.hook(), "")
+
+    def test_forged_answer_is_ignored(self):
+        self.paired()
+        self.lamp.forge_signature = True            # «дозволити» від когось, хто не знає секрету
+        self.assertEqual(self.hook(), "")
+        self.lamp.allow_answer = "deny"
+        self.assertEqual(self.hook(), "")
+
+    def test_without_pairing_or_lamp_the_hook_stays_silent(self):
+        self.paired()
+        (self.home / ".agentlight" / "allow.conf").write_text("HOST=127.0.0.1:9\nKEY=aabbccdd\nSECRET=" + "0" * 32 + "\n")
+        started = time.time()
+        self.assertEqual(self.hook(), "")           # лампи немає
+        self.assertLess(time.time() - started, 5)
+        (self.home / ".agentlight" / "allow.conf").unlink()
+        self.assertEqual(self.hook(), "")           # комп'ютер не спарований
+
+    def test_release_builds_cannot_be_touched_over_the_network(self):
+        # Маршрут «дотик запитом» існує лише для перевірки на столі. У звичайній збірці його не має бути,
+        # інакше будь-хто в мережі дозволяв би дії замість власника.
+        source = (FIRMWARE / "src" / "allow.cpp").read_text(encoding="utf-8")
+        before, _, guarded = source.partition("#ifdef ALLOW_TEST_TOUCH")
+        self.assertNotIn("/api/allow/touch", before)
+        self.assertIn("/api/allow/touch", guarded.partition("#endif")[0])
+        for config in [FIRMWARE / "platformio.ini", *(TESTS.parent / ".github" / "workflows").glob("*.yml")]:
+            self.assertNotIn("ALLOW_TEST_TOUCH", config.read_text(encoding="utf-8"), config.name)
+
+    def test_combined_claude_file_is_the_plain_one_plus_the_decision_hook(self):
+        plain = json.loads((HOOKS / "claude.json").read_text())
+        combined = json.loads((HOOKS / "claude-allow.json").read_text())
+        extra = combined["hooks"]["PermissionRequest"].pop()
+        self.assertEqual(combined, plain)
+        self.assertEqual(extra["hooks"][0]["command"], '"$HOME/.agentlight/allow.sh" claude')
+        self.assertNotIn("async", extra["hooks"][0])
+        self.assertGreater(extra["hooks"][0]["timeout"], 17, "хук має пережити 15 секунд очікування дотику")
 
 
 class LogicTests(unittest.TestCase):

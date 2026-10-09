@@ -54,6 +54,7 @@ void loadSettings() {
     {36, offsetof(Settings, mode)},    // до режимів
     {48, offsetof(Settings, focusWorkMin)},   // до таймера фокусу
     {60, offsetof(Settings, musicTouch)},     // до пульта
+    {64, offsetof(Settings, allowEnabled)},   // до «Дозволити»
     {sizeof cfg, sizeof cfg},
   };
   size_t stored = prefs.isKey("cfg") ? prefs.getBytesLength("cfg") : 0;

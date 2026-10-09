@@ -24,6 +24,7 @@ void loop() {
   pollOta();
   pollFocus();
   pollPlay();
+  pollAllow();
   render();
 
   static uint32_t lastLog = 0;

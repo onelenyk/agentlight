@@ -77,9 +77,16 @@ void pollTouch() {
   Mode mode = (Mode)cfg.mode;
   static bool inGame = false;                 // цей дотик уже передано грі: її ж треба сповістити про відпускання
   bool playing = mode == MODE_GAMES;
-  gestures.doubleEnabled = touchAction(mode, G_DOUBLE) != ACT_NONE;   // немає подвійного — дотик не чекає другого
+  bool answering = allowAsking() || allowPairing();   // лампа питає власника: дотик — так, утримання — ні
+  gestures.doubleEnabled = !answering && touchAction(mode, G_DOUBLE) != ACT_NONE;   // немає подвійного — дотик не чекає другого
   touchRaw = digitalRead(TOUCH_PIN);          // TTP223: HIGH, поки палець на сенсорі
   Gestures::Event event = gestures.update(touchRaw, millis());
+  if (answering) {                            // відповідь важливіша за будь-який режим і за вибір режиму
+    if (event == Gestures::PRESS) { touchCount++; touchAt = millis(); flash(); }
+    else if (event == Gestures::TAP) allowTouch(true);
+    else if (event == Gestures::HOLD || event == Gestures::PICK_END) allowTouch(false);
+    return;
+  }
   if (inGame && !gestures.pressed) { inGame = false; games.release(millis()); }
   switch (event) {
     case Gestures::PRESS:

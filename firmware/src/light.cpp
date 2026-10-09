@@ -133,6 +133,8 @@ void render() {
   float breathe = 0.3f + 0.7f * (0.5f + 0.5f * sinf(last / 1000.0f * PI));  // період 2 с
   if (last < flashUntil) return fill(0xFFFFFF, 1.0f, max(brightness, FLASH_MIN));  // спалах: дотик почуто
   if (pickMode >= 0) return fill(MODE_COLORS[pickMode], 1.0f, max(brightness, FLASH_MIN));   // вибір режиму утриманням
+  if (allowAsking()) return showLook(0xFFB000, AN_COMET, last * 2);      // агент просить дозвіл: бурштинова комета
+  if (allowPairing()) return fill(0x00C8FF, (last / 200) % 2 ? 1.0f : 0.1f);   // комп'ютер просить спаруватись
   if (last < rainbowUntil) return showLook(0, AN_RAINBOW, last);         // тест діодів зі сторінки
   if (last < previewUntil) return showState(previewState, last);         // проба анімації зі сторінки
   if (cfg.mode == MODE_LAMP) {                                           // просто лампа: стан WiFi й агентів не показуємо

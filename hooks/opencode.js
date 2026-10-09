@@ -12,10 +12,64 @@
 //   session.status idle                            → done, якщо в цьому ході не було помилки
 //   session.deleted                                → idle
 //
+// «Дозволити» (експериментально). Якщо є ~/.agentlight/allow.conf (його пише встановлювач зі словом allow),
+// то на permission.asked плагін ще й питає лампу. Питання в терміналі лишається на екрані: хто відповів
+// першим — термінал чи дотик до лампи — того відповідь і діє. Відповідь лампи приймається лише з правильним підписом.
+//
 // У файлі не має бути інших експортів, крім функції плагіна: OpenCode вважає плагіном кожен експорт.
+import { createHmac, randomBytes } from "node:crypto"
+import { readFileSync } from "node:fs"
+import { homedir } from "node:os"
 
-export const AgentLight = async ({ directory, worktree }) => {
+export const AgentLight = async ({ directory, worktree, client }) => {
   const url = `http://${process.env.AGENTLIGHT_HOST ?? "agentlight.local"}/api/status`
+  let allow = null             // {HOST, KEY, SECRET}, якщо комп'ютер спарований для «Дозволити»
+  try {
+    allow = Object.fromEntries(readFileSync(homedir() + "/.agentlight/allow.conf", "utf8").split("\n").filter(Boolean).map((l) => l.split("=")))
+    if (!allow.HOST || !allow.KEY || !allow.SECRET) allow = null
+  } catch {}
+  const lampAsks = new Map()   // id запиту OpenCode -> id запиту на лампі, щоб зняти його, коли відповіли в терміналі
+  const answered = new Set()   // запити, на які в OpenCode вже відповіли: лампі про них питати пізно
+  const cancelOnLamp = (lampID) => fetch(`http://${allow.HOST}/api/allow/cancel`, {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: lampID }),
+    signal: AbortSignal.timeout(2000),
+  }).catch(() => {})
+
+  // Питає лампу про дозвіл і, якщо власник відповів дотиком, відповідає OpenCode замість нього
+  const askLamp = async (p) => {
+    const base = `http://${allow.HOST}/api/allow`
+    const call = (path, init) => fetch(base + path, { ...init, signal: AbortSignal.timeout(3000) }).then((r) => r.json())
+    const nonce = randomBytes(8).toString("hex")
+    const started = await call("/ask", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ key: allow.KEY, nonce, agent_id: "opencode-" + String(p.sessionID).slice(-8), name,
+                             tool: p.permission ?? "", detail: (p.patterns ?? []).join(" ") }),
+    })
+    if (!started.id) return                              // лампа відмовилась пропонувати: відповідай у терміналі
+    if (answered.delete(p.id)) return cancelOnLamp(started.id)   // відповіли в терміналі, поки запит ішов до лампи
+    lampAsks.set(p.id, started.id)
+    for (let i = 0; i < 34 && lampAsks.has(p.id); i++) {
+      await new Promise((r) => setTimeout(r, 500))
+      const answer = await call("/ask?id=" + started.id)
+      if (answer.state === "pending") continue
+      lampAsks.delete(p.id)
+      if (answer.state !== "allow" && answer.state !== "deny") return
+      const want = createHmac("sha256", allow.SECRET).update(nonce + ":" + answer.state).digest("hex")
+      if (answer.sig !== want) return                     // відповів хтось, хто не знає секрету: не лампа
+      await client.postSessionIdPermissionsPermissionId({
+        path: { id: p.sessionID, permissionID: p.id },
+        body: { response: answer.state === "allow" ? "once" : "reject" },
+      })
+      return
+    }
+  }
+  const cancelLampAsk = (requestID) => {
+    const lampID = lampAsks.get(requestID)
+    if (lampID === undefined) { answered.add(requestID); return }   // запит до лампи ще в дорозі: askLamp зніме його сам
+    lampAsks.delete(requestID)
+    cancelOnLamp(lampID)
+  }
   const name = (worktree && worktree !== "/" ? worktree : directory).split("/").filter(Boolean).pop() ?? "opencode"
   const children = new Set()   // сесії підагентів: їхній idle — не кінець ходу, тому мовчимо про них
   const failed = new Set()     // сесії, де цей хід уже закінчився помилкою чи перериванням
@@ -74,12 +128,17 @@ export const AgentLight = async ({ directory, worktree }) => {
         case "permission.asked":
           asking.add(id)
           send(id, "waiting", "Дозвіл — " + (p.permission ?? ""))
+          if (allow && !children.has(id)) askLamp(p).catch(() => {})   // не чекаємо: питання в терміналі вже на екрані
           break
         case "question.asked":
           asking.add(id)
           send(id, "waiting", p.questions?.[0]?.question ?? "питання")
           break
         case "permission.replied":
+          if (allow) cancelLampAsk(p.requestID)
+          asking.delete(id)
+          send(id, "busy")
+          break
         case "question.replied":
         case "question.rejected":
           asking.delete(id)

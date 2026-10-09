@@ -57,6 +57,12 @@ dt{color:var(--mute)}dd{margin:0;overflow-wrap:anywhere}
   <button id="power" class="on" style="flex:none" onclick="act('toggle')">Світло</button>
 </header>
 
+<div id="askbar" class="card" hidden style="margin-bottom:10px;border-color:#ffb000">
+  <b id="asktitle"></b>
+  <div id="askdetail" style="font-size:14px;overflow-wrap:anywhere;margin:4px 0"></div>
+  <small style="margin:0">Торкнись лампи, щоб дозволити один раз. Утримай — щоб відхилити. Або дай відповідь у терміналі.</small>
+</div>
+
 <div id="updbar" class="card" hidden style="margin-bottom:10px">
   <div class="row"><span id="updtext"></span><button style="flex:none" onclick="updateNow()">Оновити</button></div>
 </div>
@@ -237,6 +243,21 @@ dt{color:var(--mute)}dd{margin:0;overflow-wrap:anywhere}
     <button onclick="act('reboot')">Перезавантажити</button>
   </div>
 
+  <h2>Дозволити · експериментально</h2>
+  <label style="display:flex;gap:8px;align-items:center;color:var(--fg);font-size:15px;margin-top:0"><input type="checkbox" id="al_on" style="width:auto" onchange="saveAllow()"> Дозволяти агентові дії дотиком до лампи</label>
+  <small style="margin-top:4px">Коли агент просить дозвіл, лампа світить бурштиновим 15 секунд: дотик — дозволити один раз, утримання — відхилити. Не торкнувся — питання лишається в терміналі. Ти дозволяєш дію, не читаючи її з екрана комп'ютера: що саме просить агент, видно вгорі цієї сторінки.</small>
+  <label>Що можна дозволяти з лампи</label>
+  <label style="display:flex;gap:8px;align-items:center;color:var(--fg);font-size:15px;margin:4px 0"><input type="checkbox" id="al_edits" style="width:auto" onchange="saveAllow()"> редагування файлів</label>
+  <label style="display:flex;gap:8px;align-items:center;color:var(--fg);font-size:15px;margin:4px 0"><input type="checkbox" id="al_commands" style="width:auto" onchange="saveAllow()"> команди в терміналі</label>
+  <label style="display:flex;gap:8px;align-items:center;color:var(--fg);font-size:15px;margin:4px 0"><input type="checkbox" id="al_other" style="width:auto" onchange="saveAllow()"> решту: мережа, MCP</label>
+  <small>Небезпечні команди — видалення, sudo, примусовий git push, запуск завантаженого з мережі та подібні — лампа не пропонує ніколи: тільки термінал.</small>
+  <label>Спаровані комп'ютери</label>
+  <div id="al_pcs" style="font-size:14px"></div>
+  <div class="row" style="margin-top:8px"><button onclick="if(confirm('Забути всі спаровані комп\'ютери? Після цього дозволяти з лампи не зможе жоден, доки не спаруєш знову.'))post('/api/allow/forget',{}).then(tick)">Забути всі</button></div>
+  <label>Спарувати цей комп'ютер і ввімкнути в агента</label>
+  <code id="al_cmd"></code>
+  <small>Працює з Claude Code і OpenCode (заміни <b>claude</b> на <b>opencode</b>). Команда попросить торкнутись лампи: так вона запам'ятовує комп'ютер. Потім перезапусти агента.</small>
+
   <h2>Прошивка</h2>
   <div id="fwline"></div>
   <div class="row" style="margin-top:8px"><button id="updbtn" onclick="updateNow()">Перевірити оновлення</button></div>
@@ -371,6 +392,7 @@ function build(d){
 const look=(patch,st)=>{Object.assign(colors,patch.colors);return save(patch).then(()=>post('/api/action',{action:'preview',state:st}));};
 const saveLamp=()=>{cfg.lamp={color:$('l_color').value,anim:$('l_anim').value,off_min:+$('l_off').value};return save({lamp:cfg.lamp}).then(tick);};
 const setMode=mode=>save({mode}).then(tick);
+const saveAllow=()=>save({allow:{enabled:$('al_on').checked,edits:$('al_edits').checked,commands:$('al_commands').checked,other:$('al_other').checked}}).then(tick);
 const load=()=>fetch('/api/debug').then(r=>r.json()).then(build).catch(()=>{});
 
 function info(d){
@@ -398,6 +420,13 @@ async function tick(){
   $('r_state').textContent=s.remote.connected?'Підключено: клавіші доходять':s.remote.bonds?'Спарована, але зараз ніхто не підключений':'Ще не спарована';
   $('r_help').textContent=s.remote.connected?'':s.remote.bonds?'Увімкни Bluetooth на спарованому пристрої й піднеси його ближче.'
     :'На комп\'ютері чи телефоні відкрий налаштування Bluetooth і підключись до '+s.wifi.ap+'. Код не потрібен.';
+  const al=s.allow;
+  $('askbar').hidden=!al.asking&&!al.pairing;
+  if(al.asking){$('asktitle').textContent=(al.asking.name||al.asking.agent)+' просить дозвіл: '+al.asking.tool;$('askdetail').textContent=al.asking.detail;}
+  else if(al.pairing){$('asktitle').textContent='Комп\'ютер «'+al.pairing+'» просить спаруватись';$('askdetail').textContent='Дотик — прийняти, утримання — відмовити.';}
+  for(const k of ['enabled','edits','commands','other']){const box=$('al_'+(k==='enabled'?'on':k));if(document.activeElement!==box)box.checked=al[k];}
+  $('al_pcs').textContent=al.computers.length?al.computers.join(', '):'жодного';
+  $('al_cmd').textContent='curl -4 -fsS http://'+lampIp+'/install.sh | sh -s -- claude allow';
   const pl=s.play,gm=GAMES[pl.game];
   [...$('gamelist').children].forEach((b,i)=>b.setAttribute('aria-pressed',i===pl.game));
   $('g_rules').textContent=gm.rules;

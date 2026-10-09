@@ -1,0 +1,179 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/claude/busy >/dev/null 2>&1 &",
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/claude/busy >/dev/null 2>&1 &",
+            "async": true,
+            "timeout": 5
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/claude/busy >/dev/null 2>&1 &",
+            "async": true,
+            "timeout": 5
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PermissionDenied": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/claude/busy >/dev/null 2>&1 &",
+            "async": true,
+            "timeout": 5
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "ElicitationResult": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/claude/busy >/dev/null 2>&1 &",
+            "async": true,
+            "timeout": 5
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/claude/busy >/dev/null 2>&1 &",
+            "async": true,
+            "timeout": 5
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/claude/waiting >/dev/null 2>&1 &",
+            "async": true,
+            "timeout": 5
+          }
+        ],
+        "matcher": "*"
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$HOME/.agentlight/allow.sh\" claude",
+            "timeout": 20
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/claude/waiting >/dev/null 2>&1 &",
+            "async": true,
+            "timeout": 5
+          }
+        ],
+        "matcher": "AskUserQuestion"
+      }
+    ],
+    "Elicitation": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/claude/waiting >/dev/null 2>&1 &",
+            "async": true,
+            "timeout": 5
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/claude/notification >/dev/null 2>&1 &",
+            "async": true,
+            "timeout": 5
+          }
+        ],
+        "matcher": "permission_prompt|elicitation_dialog|elicitation_url_dialog|agent_needs_input"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/claude/done >/dev/null 2>&1 &",
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/claude/error >/dev/null 2>&1 &",
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/claude/idle >/dev/null 2>&1 &",
+            "async": true,
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

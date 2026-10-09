@@ -15,7 +15,7 @@
 #include "focus.h"
 #include "games.h"
 
-#define FW_VERSION "0.10.0"
+#define FW_VERSION "0.11.0"
 #define HOSTNAME   "agentlight"
 
 const uint8_t FRAME_MS = 25;
@@ -79,10 +79,12 @@ struct Settings {
   uint8_t  gameSel = Games::REACTION; // режим ігор: вибрана гра
   uint8_t  diceKind = Games::YES_NO;  // що показує кубик
   uint8_t  musicTouch[G_COUNT] = {ACT_MEDIA_PLAY, ACT_MEDIA_NEXT, ACT_MEDIA_PREV};
+  uint8_t  allowEnabled = 0;          // «Дозволити» (експериментально): вимкнено, доки власник не ввімкне
+  uint8_t  allowCats = 3;             // що можна схвалювати з лампи: 1 — редагування файлів, 2 — команди, 4 — решта
 };
 // gameSel і diceKind лягли в хвіст вирівнювання, тож блок до ігор і після них однакового розміру (60);
 // loadSettings() ці два поля просто перевіряє на допустимість.
-static_assert(sizeof(Settings) == 64, "розмір Settings змінився: онови таблицю версій у loadSettings()");
+static_assert(sizeof(Settings) == 68, "розмір Settings змінився: онови таблицю версій у loadSettings()");
 extern String webhookUrl;             // адреса для дії «запит на адресу»; зберігається окремо від блоку налаштувань
 void     setWebhook(const String& url);
 uint8_t& touchAction(Mode mode, Gesture gesture);
@@ -166,6 +168,14 @@ int  remoteBonds();                             // зі скількома пр�
 void remoteForget();                            // забути всі спарювання
 void remoteMedia(uint16_t usage);               // медіа-клавіша (HID Consumer): відтворення, трек, гучність
 void remoteKey(uint8_t code);                   // звичайна клавіша (HID Keyboard)
+
+// ---- allow ----
+void allowBegin();                              // після apiBegin(): додає свої маршрути до сервера
+void pollAllow();
+bool allowAsking();                             // на лампі зараз запит дозволу від агента
+bool allowPairing();                            // комп'ютер просить спаруватись
+void allowTouch(bool yes);                      // відповідь власника: дотик — так, утримання — ні
+void fillAllow(JsonObject o);
 
 // ---- ota ----
 bool otaReady();                                // пароль оновлення задано

@@ -31,6 +31,16 @@ curl -4 -fsS http://agentlight.local/install.sh | sh -s -- claude
 | Qwen Code | `~/.qwen/settings.json` |
 | Cursor | `~/.cursor/hooks.json` |
 
+## Дозволити з лампи (експериментально)
+
+Те саме встановлення зі словом `allow` — лише для `claude` й `opencode`:
+
+```sh
+curl -4 -fsS http://agentlight.local/install.sh | sh -s -- claude allow
+```
+
+Команда спаровує комп'ютер із лампою (попросить торкнутись її), кладе секрет у `~/.agentlight/allow.conf` і додає хук, який питає лампу про дозвіл. Що це таке і які має запобіжники — у [firmware.md](firmware.md), розділ «Дозволити».
+
 ## Як це влаштовано
 
 Хук — це один виклик `curl`: він бере перші 4 КБ події агента і шле їх лампі як є.
