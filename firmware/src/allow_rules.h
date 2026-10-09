@@ -2,6 +2,7 @@
 // Чистий C++ без Arduino — у прошивці (allow.cpp) і в тестах на комп'ютері.
 #pragma once
 #include <cctype>
+#include <cstdint>
 #include <initializer_list>
 #include <string>
 
