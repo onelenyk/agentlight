@@ -27,7 +27,7 @@
 
 Стани лампи й те, які агенти крім Claude Code можна підключити: [docs/agents.md](docs/agents.md).
 
-Автоматичні тести й те, що вони ловлять: [docs/testing.md](docs/testing.md). Що заплановано далі: [docs/roadmap.md](docs/roadmap.md).
+Звіт останньої наскрізної перевірки на справжній лампі: [docs/e2e-report.md](docs/e2e-report.md). Автоматичні тести й те, що вони ловлять: [docs/testing.md](docs/testing.md). Що заплановано далі: [docs/roadmap.md](docs/roadmap.md).
 
 ## Зібрати свою
 
