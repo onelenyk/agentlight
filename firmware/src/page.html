@@ -155,6 +155,9 @@ dt{color:var(--mute)}dd{margin:0;overflow-wrap:anywhere}
   <div class="card">
     <div id="r_state" style="font-weight:600"></div>
     <small id="r_help" style="margin-top:4px"></small>
+    <label>Кому йдуть клавіші</label>
+    <div id="r_devs"></div>
+    <small style="margin-top:4px">Спарованих пристроїв може бути три, і підключені вони можуть бути всі одразу, але клавіші отримує лише вибраний. Назву впиши сам: лампа знає пристрої тільки за адресами.</small>
     <div class="row" style="margin-top:10px">
       <button onclick="act('media_prev')" aria-label="Попередній трек">⏮</button>
       <button onclick="act('media_play')" aria-label="Пауза або відтворення">⏯</button>
@@ -168,7 +171,7 @@ dt{color:var(--mute)}dd{margin:0;overflow-wrap:anywhere}
       <button onclick="act('remote_key_right')">Клавіша біля правого Shift</button>
     </div>
     <small style="margin-top:4px">При першому підключенні macOS відкриває помічник і просить натиснути ці дві клавіші по черзі. У лампи їх немає — натисни тут. Або просто закрий помічник: пульт працює й без цього.</small>
-    <div class="row" style="margin-top:8px"><button onclick="if(confirm('Забути всі спаровані пристрої? Потім лампу треба буде спарувати знову й видалити її зі списку Bluetooth на комп\'ютері.'))act('remote_forget')">Забути спарювання</button></div>
+    <div class="row" style="margin-top:8px"><button onclick="if(confirm('Забути всі спаровані пристрої? Потім лампу треба буде спарувати знову й видалити її зі списку Bluetooth на кожному з них.'))act('remote_forget')">Забути всі пристрої</button></div>
     <small>Лампа працює як Bluetooth-клавіатура: керує тим, що зараз грає на спарованому комп'ютері чи телефоні. Клавіші F13–F16 самі нічого не роблять — прив'яжи до них свої команди в Shortcuts, Raycast чи налаштуваннях клавіатури.</small>
   </div>
 
@@ -347,7 +350,7 @@ function copyCmd(){
   setTimeout(()=>{$('copybtn').textContent='Копіювати';},2500);
 }
 const PRESETS=['#ffb060','#ffffff','#ff2000','#ff5a00','#ffc800','#00ff1e','#00d0ff','#0040ff','#9000ff','#ff30a0'];
-let cfg=null,colors={};
+let cfg=null,colors={},devSig='';
 
 function options(sel,names,labels,value){
   sel.textContent='';
@@ -423,9 +426,25 @@ async function tick(){
   $('f_phase').textContent=L.phase[fo.phase]+(fo.paused?' · пауза':'')+(fo.cycles?' · завершено відрізків роботи: '+fo.cycles:'');
   $('f_left').textContent=fo.phase==='idle'?clock((cfg?cfg.focus.work_min:25)*60):clock(fo.left);
   $('f_toggle').textContent=fo.phase==='idle'?'Старт':fo.paused?'Далі з паузи':'Пауза';
-  $('r_state').textContent=s.remote.connected?'Підключено: клавіші доходять':s.remote.bonds?'Спарована, але зараз ніхто не підключений':'Ще не спарована';
-  $('r_help').textContent=s.remote.connected?'':s.remote.bonds?'Увімкни Bluetooth на спарованому пристрої й піднеси його ближче.'
+  const rm=s.remote,act_=rm.devices.find(d=>d.active);
+  $('r_state').textContent=rm.connected?'Підключено: клавіші доходять':!rm.bonds?'Ще не спарована':act_?'Вибраний пристрій зараз не підключений':'Вибери, кому слати клавіші';
+  $('r_help').textContent=rm.connected?'':rm.bonds?'Увімкни Bluetooth на вибраному пристрої й піднеси його ближче — або вибери інший.'
     :'На комп\'ютері чи телефоні відкрий налаштування Bluetooth і підключись до '+s.wifi.ap+'. Код не потрібен.';
+  const sig=JSON.stringify(rm.devices);
+  if(sig!==devSig&&!$('r_devs').contains(document.activeElement)){
+    devSig=sig;
+    const box=$('r_devs');box.textContent='';
+    if(!rm.devices.length)box.textContent='немає спарованих пристроїв';
+    rm.devices.forEach((d,i)=>{
+      const row=el('div',{className:'row'},box);row.style.marginBottom='6px';
+      const pick=el('button',{textContent:d.active?'Активний':'Вибрати',onclick:()=>save({remote:{active:d.id}}).then(tick)},row);
+      pick.style.flex='none';pick.className='on';pick.setAttribute('aria-pressed',d.active);
+      el('input',{value:d.name,placeholder:'пристрій '+(i+1)+' · '+d.id.slice(-5),ariaLabel:'Назва пристрою '+(i+1),
+        onchange:e=>save({remote:{names:{[d.id]:e.target.value}}}).then(tick)},row);
+      el('span',{textContent:d.connected?'на зв\'язку':'немає'},row).style.cssText='flex:none;font-size:13px;color:var(--mute)';
+      el('button',{textContent:'✕',ariaLabel:'Забути пристрій '+(i+1),onclick:()=>{if(confirm('Забути цей пристрій? На ньому лампу теж треба видалити зі списку Bluetooth.'))act('remote_forget',{id:d.id});}},row).style.flex='none';
+    });
+  }
   const al=s.allow;
   $('askbar').hidden=!al.asking&&!al.pairing;
   if(al.asking){$('asktitle').textContent=(al.asking.name||al.asking.agent)+' просить дозвіл: '+al.asking.tool;$('askdetail').textContent=al.asking.detail;}

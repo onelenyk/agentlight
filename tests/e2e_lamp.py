@@ -688,6 +688,30 @@ if wanted("modes"):
         assert up > start and down < up, (start, up, down)
         return f"гучність {start} → {up} → {down}, потім повернув {before}"
 
+    @check("пульт: клавіші йдуть лише вибраному пристрою")
+    def _():
+        devices = status()["remote"]["devices"]
+        if len(devices) < 2 or not all(d["connected"] for d in devices[:2]):
+            raise Skip("потрібні два підключені спаровані пристрої")
+        volume = lambda: int(sh("osascript -e 'output volume of (get volume settings)'").stdout.strip())  # noqa: E731
+        original = next(d["id"] for d in devices if d["active"])
+        before = volume()
+        sh("osascript -e 'set volume output volume 40'")
+        moved = {}
+        for d in devices[:2]:
+            assert [x["id"] for x in config({"remote": {"active": d["id"]}})["remote"]["devices"] if x["active"]] == [d["id"]]
+            start = volume()
+            action("volume_up")
+            time.sleep(1)
+            moved[d["id"]] = volume() != start
+            action("volume_down")
+            time.sleep(1)
+        assert [x["id"] for x in config({"remote": {"active": "11:22:33:44:55:66"}})["remote"]["devices"] if x["active"]] == [devices[1]["id"]]
+        config({"remote": {"active": original}})
+        sh(f"osascript -e 'set volume output volume {before}'")
+        assert sorted(moved.values()) == [False, True], moved      # гучність цього Mac міняє рівно один із двох
+        return "гучність цього Mac змінилась лише тоді, коли активним був він"
+
     @check("налаштування переживають перезавантаження; «типові» їх скидає")
     def _():
         config({"mode": "lamp", "lamp": {"color": "#00d0ff", "anim": "wave", "off_min": 0}, "focus": {"work_min": 33}, "game": 3,

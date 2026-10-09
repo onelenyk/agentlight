@@ -51,45 +51,123 @@ static const uint8_t REPORT_MAP[] = {
 };
 static NimBLECharacteristic* keyboardReport = nullptr;
 static NimBLECharacteristic* mediaReport = nullptr;
-static volatile uint8_t secured = 0;      // скільки підключених пристроїв пройшли спарювання: їм можна слати клавіші
+// Пульт для кількох пристроїв. Спарованих може бути три, і підключатись вони можуть усі одразу — так вони
+// не «чіпляються» назад щоразу, як їх відключиш. Але клавіші йдуть лише одному, активному; його вибирають
+// на сторінці лампи. Пристрій упізнаємо за адресою, під якою він спарований.
+struct Link { uint16_t conn; char id[18]; };
+static Link     links[CONFIG_BT_NIMBLE_MAX_CONNECTIONS];   // підключені пристрої, що пройшли спарювання
+static uint8_t  linkCount = 0;
+static portMUX_TYPE linksLock = portMUX_INITIALIZER_UNLOCKED;   // список міняє потік Bluetooth, читає loop()
+static String   activeId;                 // адреса активного пристрою; порожня — ще не вибрано
+static JsonDocument labels;               // назви, які дав власник: {адреса: назва}
+static volatile bool activeDirty = false; // активного вибрано автоматично: зберегти з loop()
+
+static int connOf(const String& id) {     // з'єднання пристрою з такою адресою або -1
+  int conn = -1;
+  portENTER_CRITICAL(&linksLock);
+  for (uint8_t i = 0; i < linkCount; i++) if (id == links[i].id) conn = links[i].conn;
+  portEXIT_CRITICAL(&linksLock);
+  return conn;
+}
 
 class ServerCallbacks : public NimBLEServerCallbacks {
-  void onConnect(NimBLEServer*) override { NimBLEDevice::startAdvertising(); }   // лишаємось видимими для другого пристрою
   void onDisconnect(NimBLEServer*, ble_gap_conn_desc* desc) override {
-    if (desc->sec_state.encrypted && secured) secured--;
-    NimBLEDevice::startAdvertising();
+    portENTER_CRITICAL(&linksLock);
+    for (uint8_t i = 0; i < linkCount; i++)
+      if (links[i].conn == desc->conn_handle) { links[i] = links[--linkCount]; break; }
+    portEXIT_CRITICAL(&linksLock);
   }
   void onAuthenticationComplete(ble_gap_conn_desc* desc) override {
-    if (desc->sec_state.encrypted) secured++;
+    if (!desc->sec_state.encrypted) return;
+    std::string id = NimBLEAddress(desc->peer_id_addr).toString();
+    portENTER_CRITICAL(&linksLock);
+    bool known = false;
+    for (uint8_t i = 0; i < linkCount; i++) if (links[i].conn == desc->conn_handle) known = true;
+    if (!known && linkCount < CONFIG_BT_NIMBLE_MAX_CONNECTIONS) {
+      links[linkCount].conn = desc->conn_handle;
+      strlcpy(links[linkCount].id, id.c_str(), sizeof links[linkCount].id);
+      linkCount++;
+    }
+    portEXIT_CRITICAL(&linksLock);
+    if (!activeId.length()) { activeId = id.c_str(); activeDirty = true; }   // перший спарований стає активним
   }
 };
 
-bool remoteConnected() { return secured > 0; }
+bool remoteConnected() { return activeId.length() && connOf(activeId) >= 0; }
 int  remoteBonds() { return NimBLEDevice::getNumBonds(); }
-void remoteForget() { NimBLEDevice::deleteAllBonds(); }
 
-// Натиснути й одразу відпустити: два звіти з паузою, інакше система може не помітити натискання
-void remoteMedia(uint16_t usage) {
-  if (!remoteConnected()) return;
-  uint8_t down[2] = {(uint8_t)usage, (uint8_t)(usage >> 8)}, up[2] = {0, 0};
-  mediaReport->setValue(down, sizeof down);
-  mediaReport->notify();
+void remoteSetActive(const String& id) {
+  if (!NimBLEDevice::isBonded(NimBLEAddress(id.c_str()))) return;
+  activeId = id;
+  prefs.putString("rmt_active", activeId);
+}
+
+void remoteSetName(const String& id, const String& name) {
+  if (name.length()) labels[id] = name.substring(0, 24); else labels.remove(id);
+  String out;
+  serializeJson(labels, out);
+  prefs.putString("rmt_names", out);
+}
+
+// Забути один пристрій (за адресою) або всі (порожній рядок). На самому пристрої лампу теж треба видалити.
+void remoteForget(const String& id) {
+  NimBLEServer* srv = NimBLEDevice::getServer();
+  if (id.length()) {
+    int conn = connOf(id);
+    if (conn >= 0) srv->disconnect(conn);
+    NimBLEDevice::deleteBond(NimBLEAddress(id.c_str()));
+    labels.remove(id);
+    if (activeId == id) activeId = "";
+  } else {
+    for (uint8_t i = 0; i < linkCount; i++) srv->disconnect(links[i].conn);
+    NimBLEDevice::deleteAllBonds();
+    labels.to<JsonObject>();
+    activeId = "";
+  }
+  String out;
+  serializeJson(labels, out);
+  prefs.putString("rmt_names", out);
+  if (activeId.length()) prefs.putString("rmt_active", activeId); else prefs.remove("rmt_active");
+}
+
+void fillRemote(JsonObject o) {
+  o["connected"] = remoteConnected();
+  o["bonds"] = remoteBonds();
+  JsonArray devices = o["devices"].to<JsonArray>();
+  for (int i = 0; i < NimBLEDevice::getNumBonds(); i++) {
+    String id = NimBLEDevice::getBondedAddress(i).toString().c_str();
+    JsonObject d = devices.add<JsonObject>();
+    d["id"] = id;
+    d["name"] = labels[id] | "";
+    d["connected"] = connOf(id) >= 0;
+    d["active"] = id == activeId;
+  }
+}
+
+// Звіт лише активному пристрою: натиснути й одразу відпустити, з паузою — інакше система може не помітити
+static void sendReport(NimBLECharacteristic* report, const uint8_t* down, size_t size) {
+  int conn = activeId.length() ? connOf(activeId) : -1;
+  if (conn < 0) return;
+  uint8_t up[8] = {};
+  ble_gattc_notify_custom(conn, report->getHandle(), ble_hs_mbuf_from_flat(down, size));
   delay(20);
-  mediaReport->setValue(up, sizeof up);
-  mediaReport->notify();
+  ble_gattc_notify_custom(conn, report->getHandle(), ble_hs_mbuf_from_flat(up, size));
+}
+
+void remoteMedia(uint16_t usage) {
+  uint8_t down[2] = {(uint8_t)usage, (uint8_t)(usage >> 8)};
+  sendReport(mediaReport, down, sizeof down);
 }
 
 void remoteKey(uint8_t code) {
-  if (!remoteConnected()) return;
-  uint8_t down[8] = {0, 0, code, 0, 0, 0, 0, 0}, up[8] = {};
-  keyboardReport->setValue(down, sizeof down);
-  keyboardReport->notify();
-  delay(20);
-  keyboardReport->setValue(up, sizeof up);
-  keyboardReport->notify();
+  uint8_t down[8] = {0, 0, code, 0, 0, 0, 0, 0};
+  sendReport(keyboardReport, down, sizeof down);
 }
 
 void bleBegin() {
+  if (prefs.isKey("rmt_active")) activeId = prefs.getString("rmt_active");
+  if (deserializeJson(labels, prefs.isKey("rmt_names") ? prefs.getString("rmt_names") : String("{}")) || !labels.is<JsonObject>())
+    labels.to<JsonObject>();
   NimBLEDevice::init(apName.c_str());
   NimBLEServer* srv = NimBLEDevice::createServer();
   srv->setCallbacks(new ServerCallbacks());
@@ -140,6 +218,7 @@ void pollBle() {
     // Після підключення пристрою оголошення зупиняється, і запустити його з обробника підключення не виходить.
     // Тому стежимо звідси: поки є вільне з'єднання, лампу має бути видно — інакше зі спарованим комп'ютером
     // ніхто інший не знайшов би її, щоб налаштувати WiFi.
+    if (activeDirty) { activeDirty = false; prefs.putString("rmt_active", activeId); }
     NimBLEServer* srv = NimBLEDevice::getServer();
     if (srv && srv->getConnectedCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS && !NimBLEDevice::getAdvertising()->isAdvertising())
       NimBLEDevice::startAdvertising();

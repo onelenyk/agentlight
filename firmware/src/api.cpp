@@ -35,9 +35,7 @@ void fillStatus(JsonObject o) {
   fillFocus(o["focus"].to<JsonObject>());
   fillGame(o["play"].to<JsonObject>());
   fillAllow(o["allow"].to<JsonObject>());
-  JsonObject remote = o["remote"].to<JsonObject>();  // пульт: чи є кому слати клавіші
-  remote["connected"] = remoteConnected();
-  remote["bonds"] = remoteBonds();
+  fillRemote(o["remote"].to<JsonObject>());          // пульт: спаровані пристрої і хто з них активний
   JsonObject sig = o["signal"].to<JsonObject>();     // дія сенсора «сигнал агентові»
   sig["count"] = signalCount;
   if (signalCount) sig["ago"] = (millis() - signalAt) / 1000;
@@ -168,6 +166,8 @@ static void handleConfig() {
     cfg.lampOffMin = constrain(in["lamp"]["off_min"] | (int)cfg.lampOffMin, 0, 1440);
     lightSwitch(true);                  // зміну видно одразу, таймер рахує заново
   }
+  if (in["remote"]["active"].is<const char*>()) remoteSetActive(in["remote"]["active"].as<String>());
+  for (JsonPairConst name : in["remote"]["names"].as<JsonObjectConst>()) remoteSetName(name.key().c_str(), name.value() | "");
   if (in["allow"].is<JsonObjectConst>()) {
     JsonObjectConst a = in["allow"];
     cfg.allowEnabled = a["enabled"] | (bool)cfg.allowEnabled;
@@ -214,7 +214,7 @@ static void handleAction() {
   else if (action == "toggle") lightSwitch(lightOff);
   else if (action == "game_tap") { games.press(millis()); games.release(millis()); }   // дотик у грі зі сторінки
   else if (action == "game_records") resetRecords();
-  else if (action == "remote_forget") remoteForget();
+  else if (action == "remote_forget") remoteForget(in["id"] | "");
   // macOS, уперше побачивши клавіатуру, просить натиснути клавіші біля лівого й правого Shift, щоб визначити
   // розкладку. У лампи клавіш немає, тож ці дві натискаються зі сторінки. Інших клавіш звідси надіслати не можна.
   else if (action == "remote_key_left") remoteKey(0x1D);    // Z

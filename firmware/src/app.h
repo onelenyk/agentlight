@@ -15,7 +15,7 @@
 #include "focus.h"
 #include "games.h"
 
-#define FW_VERSION "0.11.1"
+#define FW_VERSION "0.12.0"
 #define HOSTNAME   "agentlight"
 
 const uint8_t FRAME_MS = 25;
@@ -163,9 +163,12 @@ void hookBegin();                               // після apiBegin(): при
 // ---- ble ----
 void bleBegin();
 void pollBle();
-bool remoteConnected();                         // комп'ютер чи телефон підключений до лампи як до пульта
+bool remoteConnected();                         // активний пристрій пульта підключений: клавіші дійдуть
 int  remoteBonds();                             // зі скількома пристроями лампа спарована
-void remoteForget();                            // забути всі спарювання
+void remoteSetActive(const String& id);         // кому слати клавіші
+void remoteSetName(const String& id, const String& name);
+void remoteForget(const String& id);            // забути один пристрій; порожній рядок — усі
+void fillRemote(JsonObject o);
 void remoteMedia(uint16_t usage);               // медіа-клавіша (HID Consumer): відтворення, трек, гучність
 void remoteKey(uint8_t code);                   // звичайна клавіша (HID Keyboard)
 
