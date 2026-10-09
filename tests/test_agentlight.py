@@ -93,8 +93,11 @@ class HookFileTests(unittest.TestCase):
                 with self.subTest(agent=agent, command=command[-60:]):
                     self.assertIn("head -c 4000", command)                      # лампа не приймає великих тіл
                     self.assertIn("Content-Type: application/json", command)    # інакше прошивка не побачить тіла
-                    self.assertIn("-m 2", command)
-                    self.assertIn(">/dev/null 2>&1 &", command)                 # запит у фоні: агент не чекає
+                    if agent == "claude" and command.endswith("/hook/claude/idle >/dev/null 2>&1"):
+                        self.assertIn("-m 1", command)                          # кінець сесії: єдиний хук, що чекає на curl
+                    else:
+                        self.assertIn("-m 2", command)
+                        self.assertIn(">/dev/null 2>&1 &", command)             # запит у фоні: агент не чекає
                     address = command.split("http://agentlight.local/hook/")[1].split()[0]
                     self.assertEqual(address.split("/")[0], tool)
                     self.assertIn(address.split("/")[1], STATES)
@@ -105,7 +108,7 @@ class HookFileTests(unittest.TestCase):
                 self.assertRegex(command, r"& echo '\{.*\}'$", agent)
         for agent in ("claude", "codex", "qwen", "cursor", "copilot"):
             for command in commands(self.load(agent)):
-                self.assertTrue(command.endswith("&"), agent)
+                self.assertNotIn("echo", command, agent)
 
     def test_claude_style_shape(self):
         for agent in ("claude", "codex", "qwen", "gemini"):
@@ -114,6 +117,17 @@ class HookFileTests(unittest.TestCase):
                     with self.subTest(agent=agent, event=event):
                         self.assertIsInstance(entry["hooks"], list)
                         self.assertEqual(entry["hooks"][0]["type"], "command")
+
+    def test_session_end_hook_waits_for_its_request(self):
+        # Усе, що Claude Code запустив у фоні, він обриває при виході, і «спокій» не встигав дійти до справжньої
+        # лампи: сесія висіла на ній до кінця свого часу. Тому хук кінця сесії — єдиний — чекає на curl, але недовго.
+        for name in ("claude", "claude-allow"):
+            hooks = self.load(name)["hooks"]
+            end = hooks["SessionEnd"][0]["hooks"][0]
+            self.assertNotIn("async", end, name)
+            self.assertFalse(end["command"].rstrip().endswith("&"), name)
+            self.assertIn("-m 1 ", end["command"], name)
+            self.assertTrue(hooks["Stop"][0]["hooks"][0]["async"], name)
 
     def test_claude_covers_all_five_states(self):
         states = {c.split("/hook/claude/")[1].split()[0] for c in commands(self.load("claude"))}

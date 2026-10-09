@@ -162,6 +162,12 @@ dt{color:var(--mute)}dd{margin:0;overflow-wrap:anywhere}
       <button onclick="act('volume_down')" aria-label="Тихіше">🔉</button>
       <button onclick="act('volume_up')" aria-label="Гучніше">🔊</button>
     </div>
+    <label>Mac питає, яка це клавіатура?</label>
+    <div class="row">
+      <button onclick="act('remote_key_left')">Клавіша біля лівого Shift</button>
+      <button onclick="act('remote_key_right')">Клавіша біля правого Shift</button>
+    </div>
+    <small style="margin-top:4px">При першому підключенні macOS відкриває помічник і просить натиснути ці дві клавіші по черзі. У лампи їх немає — натисни тут. Або просто закрий помічник: пульт працює й без цього.</small>
     <div class="row" style="margin-top:8px"><button onclick="if(confirm('Забути всі спаровані пристрої? Потім лампу треба буде спарувати знову й видалити її зі списку Bluetooth на комп\'ютері.'))act('remote_forget')">Забути спарювання</button></div>
     <small>Лампа працює як Bluetooth-клавіатура: керує тим, що зараз грає на спарованому комп'ютері чи телефоні. Клавіші F13–F16 самі нічого не роблять — прив'яжи до них свої команди в Shortcuts, Raycast чи налаштуваннях клавіатури.</small>
   </div>

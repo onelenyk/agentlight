@@ -137,6 +137,12 @@ void pollBle() {
   static uint32_t statusAt = 0;
   if (millis() - statusAt > 1000) {
     statusAt = millis();
+    // Після підключення пристрою оголошення зупиняється, і запустити його з обробника підключення не виходить.
+    // Тому стежимо звідси: поки є вільне з'єднання, лампу має бути видно — інакше зі спарованим комп'ютером
+    // ніхто інший не знайшов би її, щоб налаштувати WiFi.
+    NimBLEServer* srv = NimBLEDevice::getServer();
+    if (srv && srv->getConnectedCount() < CONFIG_BT_NIMBLE_MAX_CONNECTIONS && !NimBLEDevice::getAdvertising()->isAdvertising())
+      NimBLEDevice::startAdvertising();
     JsonDocument doc;
     fillWifi(doc.to<JsonObject>());
     doc["name"] = apName;

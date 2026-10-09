@@ -18,11 +18,30 @@
 //
 // У файлі не має бути інших експортів, крім функції плагіна: OpenCode вважає плагіном кожен експорт.
 import { createHmac, randomBytes } from "node:crypto"
+import { lookup } from "node:dns/promises"
 import { readFileSync } from "node:fs"
 import { homedir } from "node:os"
 
 export const AgentLight = async ({ directory, worktree, client }) => {
-  const url = `http://${process.env.AGENTLIGHT_HOST ?? "agentlight.local"}/api/status`
+  // Адресу лампи шукаємо самі й лише в IPv4: звичайний fetch за іменем *.local на macOS спершу 5 секунд чекає
+  // на IPv6-відповідь, якої лампа не дає, і не вкладається в наш час очікування. Знайдену адресу пам'ятаємо.
+  const known = new Map()
+  const lampFetch = async (host, path, init, timeoutMs = 2000) => {
+    let address = known.get(host)
+    if (!address) {
+      const [name, port] = host.split(":")
+      const ip = /^[\d.]+$/.test(name) ? name : (await lookup(name, { family: 4 })).address
+      address = port ? `${ip}:${port}` : ip
+      known.set(host, address)
+    }
+    try {
+      return await fetch(`http://${address}${path}`, { ...init, signal: AbortSignal.timeout(timeoutMs) })   // час — лише на сам запит
+    } catch (error) {
+      known.delete(host)                                 // лампа могла отримати нову адресу
+      throw error
+    }
+  }
+  const statusHost = process.env.AGENTLIGHT_HOST ?? "agentlight.local"
   let allow = null             // {HOST, KEY, SECRET}, якщо комп'ютер спарований для «Дозволити»
   try {
     allow = Object.fromEntries(readFileSync(homedir() + "/.agentlight/allow.conf", "utf8").split("\n").filter(Boolean).map((l) => l.split("=")))
@@ -30,15 +49,13 @@ export const AgentLight = async ({ directory, worktree, client }) => {
   } catch {}
   const lampAsks = new Map()   // id запиту OpenCode -> id запиту на лампі, щоб зняти його, коли відповіли в терміналі
   const answered = new Set()   // запити, на які в OpenCode вже відповіли: лампі про них питати пізно
-  const cancelOnLamp = (lampID) => fetch(`http://${allow.HOST}/api/allow/cancel`, {
+  const cancelOnLamp = (lampID) => lampFetch(allow.HOST, "/api/allow/cancel", {
     method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: lampID }),
-    signal: AbortSignal.timeout(2000),
   }).catch(() => {})
 
   // Питає лампу про дозвіл і, якщо власник відповів дотиком, відповідає OpenCode замість нього
   const askLamp = async (p) => {
-    const base = `http://${allow.HOST}/api/allow`
-    const call = (path, init) => fetch(base + path, { ...init, signal: AbortSignal.timeout(3000) }).then((r) => r.json())
+    const call = (path, init) => lampFetch(allow.HOST, "/api/allow" + path, init, 3000).then((r) => r.json())
     const nonce = randomBytes(8).toString("hex")
     const started = await call("/ask", {
       method: "POST",
@@ -75,6 +92,7 @@ export const AgentLight = async ({ directory, worktree, client }) => {
   const failed = new Set()     // сесії, де цей хід уже закінчився помилкою чи перериванням
   const asking = new Set()     // сесії, що чекають відповіді: busy від session.status не має затерти waiting
   const tasks = new Map()
+  let queue = Promise.resolve() // черга станів до лампи
   const pending = new Set()    // запити в дорозі: dispose дочекається їх, щоб «готово» не загубилось при виході
   const shown = new Map()      // останній надісланий стан сесії: повтор без нового тексту не шлемо, щоб не затерти message
 
@@ -85,12 +103,12 @@ export const AgentLight = async ({ directory, worktree, client }) => {
     shown.set(sessionID, state)
     const body = { state, agent_id: "opencode-" + String(sessionID).slice(-8), name, message: (message ?? "").slice(0, 100) }
     if (tasks.has(sessionID)) body.task = tasks.get(sessionID)
-    const request = fetch(url, {
+    // Стани йдуть по одному, в порядку появи: інакше «готово» могло б випередити «працює» й лампа показала б не те
+    const request = (queue = queue.then(() => lampFetch(statusHost, "/api/status", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(2000),
-    }).catch(() => {}).finally(() => pending.delete(request))
+    }).catch(() => {}))).finally(() => pending.delete(request))
     pending.add(request)
   }
 

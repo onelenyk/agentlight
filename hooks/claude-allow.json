@@ -168,8 +168,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 2 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/claude/idle >/dev/null 2>&1 &",
-            "async": true,
+            "command": "d=$(head -c 4000); printf %s \"$d\" | curl -4 -s -m 1 -o /dev/null -X POST -H 'Content-Type: application/json' --data-binary @- http://agentlight.local/hook/claude/idle >/dev/null 2>&1",
             "timeout": 5
           }
         ]

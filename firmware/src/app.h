@@ -15,7 +15,7 @@
 #include "focus.h"
 #include "games.h"
 
-#define FW_VERSION "0.11.0"
+#define FW_VERSION "0.11.1"
 #define HOSTNAME   "agentlight"
 
 const uint8_t FRAME_MS = 25;

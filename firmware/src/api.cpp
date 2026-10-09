@@ -215,6 +215,10 @@ static void handleAction() {
   else if (action == "game_tap") { games.press(millis()); games.release(millis()); }   // дотик у грі зі сторінки
   else if (action == "game_records") resetRecords();
   else if (action == "remote_forget") remoteForget();
+  // macOS, уперше побачивши клавіатуру, просить натиснути клавіші біля лівого й правого Shift, щоб визначити
+  // розкладку. У лампи клавіш немає, тож ці дві натискаються зі сторінки. Інших клавіш звідси надіслати не можна.
+  else if (action == "remote_key_left") remoteKey(0x1D);    // Z
+  else if (action == "remote_key_right") remoteKey(0x38);   // /
   else if (indexOf(action.c_str(), ACTION_NAMES, ACT_COUNT, ACT_COUNT) != ACT_COUNT) {   // будь-яка дія сенсора, зі сторінки
     uint8_t act = indexOf(action.c_str(), ACTION_NAMES, ACT_COUNT, ACT_COUNT);
     if (!actionFits(act, (Mode)cfg.mode)) return sendError(400, "action does not fit this mode");
