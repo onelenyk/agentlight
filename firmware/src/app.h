@@ -50,7 +50,9 @@ bool actionFits(uint8_t action, Mode mode);     // чи має дія сенс �
 
 // Анімації діодів; кожному стану в налаштуваннях призначена своя
 enum Anim : uint8_t { AN_SOLID, AN_BREATHE, AN_BLINK, AN_SPIN, AN_COMET, AN_WAVE, AN_HEARTBEAT, AN_SPARKLE,
-                      AN_PENDULUM, AN_FILL, AN_BEACON, AN_RAINBOW, AN_COUNT };   // rainbow ігнорує колір
+                      AN_PENDULUM, AN_FILL, AN_BEACON, AN_RAINBOW,               // rainbow ігнорує колір
+                      AN_CANDLE, AN_FIRE, AN_LAVA, AN_AURORA, AN_STORM, AN_DAWN, AN_THINKING, AN_RADAR, AN_FIREWORK, AN_SIREN,
+                      AN_COUNT };                                                // fire, aurora, storm теж мають свої кольори
 extern const char* const ANIM_NAMES[AN_COUNT];
 
 // ---- settings ----

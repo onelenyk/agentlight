@@ -310,7 +310,9 @@ const clock=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
 const L={
   state:{busy:'Працює',waiting:'Чекає на тебе',done:'Готово',error:'Помилка',idle:'Спокій'},
   anim:{solid:'рівно',breathe:'дихання',blink:'блимання',spin:'вогник по колу',comet:'комета',wave:'хвиля',heartbeat:'серцебиття',
-    sparkle:'іскри',pendulum:'маятник',fill:'наповнення',beacon:'маячок',rainbow:'веселка'},
+    sparkle:'іскри',pendulum:'маятник',fill:'наповнення',beacon:'маячок',rainbow:'веселка',
+    candle:'свічка',fire:'камін',lava:'лава',aurora:'північне сяйво',storm:'гроза',dawn:'світанок (10 хв)',thinking:'думає',
+    radar:'радар',firework:'салют',siren:'сирена'},
   act:{none:'нічого',dismiss:'побачив: погасити готово й чекає',brightness:'яскравість по колу',toggle:'увімкнути / вимкнути світло',
     mode:'наступний режим',animation:'наступна анімація',color:'наступний колір',sleep:'таймер сну',signal:'сигнал агентові',
     webhook:'запит на адресу',spark:'спалах веселки',focus_toggle:'старт / пауза',focus_skip:'наступний відрізок',focus_reset:'скинути таймер',

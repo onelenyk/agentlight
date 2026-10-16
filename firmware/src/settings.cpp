@@ -9,7 +9,9 @@ const char* const ACTION_NAMES[ACT_COUNT] = {"none", "dismiss", "brightness", "t
                                              "media_play", "media_next", "media_prev", "volume_up", "volume_down",
                                              "key_f13", "key_f14", "key_f15", "key_f16"};
 const char* const ANIM_NAMES[AN_COUNT] = {"solid", "breathe", "blink", "spin", "comet", "wave", "heartbeat", "sparkle",
-                                          "pendulum", "fill", "beacon", "rainbow"};
+                                          "pendulum", "fill", "beacon", "rainbow",
+                                          "candle", "fire", "lava", "aurora", "storm", "dawn", "thinking", "radar",
+                                          "firework", "siren"};
 
 Settings    cfg;
 uint8_t     brightness = 60;
