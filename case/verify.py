@@ -132,7 +132,12 @@ check(vol(board.translate([-0.3, 0, 0]), P["clamp"]) > 0.05, "із засувк�
 check(vol(board.translate([0.3, 0, 0]), P["base"]) > 0.05, "уперед плату тримає стінка")
 sweep(leds, P["carrier"], [lambda m, z=z: m.translate([0, 0, z]) for z in zs], "платки діодів засуваються в кишені згори")
 sweep(touch, P["diffuser"], [lambda m, z=z: m.translate([0, 0, -z]) for z in zs], "сенсорний модуль вставляється в гніздо знизу")
-sweep(P["diffuser"] + touch, P["carrier"] + leds, [lambda m, z=z: m.translate([0, 0, z]) for z in zs], "розсіювач надягається на диск")
+# защіпка: виступи розсіювача на шляху заходять у бортик на SNAP_IN - 0,1 = 0,2 мм — це задумано, стінка пружинить
+snap = max(vol(P["diffuser"].translate([0, 0, z]), P["carrier"]) for z in zs)
+check(0.05 < snap < 1.5, f"розсіювач засклацується на диск: натяг на шляху {snap:.2f} мм³ — лише три виступи по {B.SNAP_DEG:.0f}°")
+sweep(P["diffuser"] + touch, leds, [lambda m, z=z: m.translate([0, 0, z]) for z in zs], "розсіювач надягається, не чіпаючи діодів")
+check(vol(P["diffuser"].translate([0, 0, 0.5]), P["carrier"]) > 0.01, "засклацнутий розсіювач сам не знімається: виступи впираються в канавку")
+check(vol(P["diffuser"].translate([0, 0, -0.05]), P["carrier"]) > 0.01, "розсіювач стоїть на диску, виступи не заважають йому сісти")
 sweep(P["carrier"] + leds + P["diffuser"] + touch, P["base"] + P["clamp"], [lambda m, z=z: m.translate([0, 0, z]) for z in zs],
       "диск із діодами й розсіювачем лягає на шийку")
 # розсіювач навмисно на DIFF_PRELOAD вищий, тому для руху ковпака беремо його без цього натягу
