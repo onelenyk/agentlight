@@ -1,8 +1,8 @@
 """Корпус AgentLight: ліхтарик Ø38 x 36 мм під ESP32-C3 Super Mini і 3 x WS2812B на круглих платках Ø9,5.
 
 П'ять деталей, усі друкуються без підтримок:
-  base    — основа з тунелем під USB-C і шийкою з трьома зубами байонета
-  clamp   — рамка, що притискає плату за корпус USB-роз'єму
+  base    — основа: роз'єм USB-C щільно сидить у вікні плаского зрізу спереду; шийка з трьома зубами байонета
+  clamp   — засувка позаду плати: не дає їй відсунутись назад і піднятись
   carrier — диск із трьома кишенями: платки зі світлодіодами засуваються в них згори
   diffuser — білий тонкий стакан навколо діодів: розсіює світло і ховає нутрощі
   dome    — зовнішній ковпак (прозорий), надягається і закручується за годинниковою стрілкою
@@ -20,7 +20,7 @@ set_circular_segments(160)
 
 # ---- Плата: типові розміри Super Mini, ті самі, що в meteor-orb/cad/orb.py (товщину варто поміряти) ----
 PCB_L, PCB_W, PCB_T = 22.52, 18.0, 1.0
-USB_W, USB_H, USB_LEN, USB_OVERHANG = 8.94, 3.2, 7.3, 1.2   # роз'єм: ширина, висота, довжина, виступ за край плати
+USB_W, USB_H, USB_LEN, USB_OVERHANG = 8.94, 3.26, 7.3, 1.2  # роз'єм: ширина, висота, довжина, виступ за край плати
 PCB_CLR = 0.2          # зазор навколо плати
 PCB_RAISE = 1.5        # просвіт під платою для кінчиків дротів і крапель припою
 
@@ -33,7 +33,13 @@ Z_NECK = 17.0          # верх шийки
 R_NECK = 16.6          # зовнішній радіус шийки
 FIT = 0.2              # зазор між шийкою і спідницею ковпака
 SEAM = 0.3             # видима щілина між основою і ковпаком (ковпак тисне на диск, а не на основу)
-TUNNEL_W, TUNNEL_H = 14.0, 8.0   # отвір під штекер USB-C разом з його пластиковим корпусом
+# Роз'єм USB-C виходить у пласку грань спереду, у вікно точно під себе: штекер упирається в грань, корпус не хитається.
+# Далі вперед плату не посунути: її кути й так майже торкаються зовнішньої стінки.
+X_FLAT = 16.8          # пласка грань спереду основи
+USB_RECESS = 0.2       # на стільки роз'єм утоплений від грані: штекер USB-C має бути вставлений повністю
+USB_FIT = 0.10         # зазор роз'єму у вікні з кожного боку; підбирається пробником case/stl/usb_fit_test.stl
+SOLDER_UP = 2.0        # місце над платою в кишені стінки: припій і дроти на перших пінах
+SLIDE = 3.6            # плату опускають на стільки позаду і засувають уперед, у кишеню стінки
 
 # ---- Світлодіоди: круглі платки Ø9,5, з діодом 2,7 мм завтовшки (поміряно для meteor-orb), контакти ззаду ----
 LED_PCB_D = 9.5
@@ -68,8 +74,8 @@ TWIST_DEG = 35.0       # хід повороту
 CAM_START, CAM_RISE = -0.6, 0.9   # полиця паза піднімається по ходу: спершу люфт 0,6, наприкінці натяг 0,3
 
 # ---- Похідні ----
-X_FRONT = 11.9                              # передній край плати впирається сюди
-X_REAR = X_FRONT - PCB_L - 0.3              # задній упор
+X_FRONT = X_FLAT - USB_RECESS - USB_OVERHANG   # передній край плати
+X_BACK = X_FRONT - PCB_L                    # задній край плати
 Z_PCB = FLOOR + PCB_RAISE                   # низ плати
 Z_PCB_TOP = Z_PCB + PCB_T
 Z_USB_TOP = Z_PCB_TOP + USB_H
@@ -85,10 +91,14 @@ HOLDER_R1 = HOLDER_R0 + 2 * LED_LIP + LED_PCB_T + 0.3   # передня пло�
 Z_CEIL = Z_POST_TOP + TOP_GAP
 HEIGHT = Z_CEIL + WALL_DOME
 R_DOME_IN = R_OUT - WALL_DOME
-CLAMP_X0, CLAMP_T = 5.85, 2.5               # рамка стоїть над USB-роз'ємом
-CLAMP_FIT = 0.2                             # зазор ніжки рамки в пазу, з кожного боку
-CLAMP_SHORT = 0.15                          # рамка нижча за шийку: диск має лягти на шийку, а не на рамку
-CLAMP_Y_IN, CLAMP_Y_OUT = PCB_W / 2 + 0.4, 11.7
+CLAMP_T = 2.5                               # товщина засувки
+CLAMP_GAP = 0.1                             # від засувки до заднього краю плати
+CLAMP_X0 = X_BACK - CLAMP_GAP - CLAMP_T     # задня площина засувки
+CLAMP_FIT = 0.2                             # зазор засувки в пазу, з кожного боку
+CLAMP_SHORT = 0.15                          # засувка нижча за шийку: диск має лягти на шийку, а не на неї
+CLAMP_Y = 11.0                              # півширина засувки
+CLAMP_LIP, CLAMP_LIP_W = 0.8, 9.6           # виступ засувки над заднім краєм плати: глибина і ширина, як колишній гачок
+FRONT_GAP = 0.1                             # від переднього краю плати до кінця кишені в стінці
 
 
 def box(x0, x1, y0, y1, z0, z1):
@@ -118,27 +128,28 @@ def lug_bottom(r):
     return LUG_TOP - LUG_SIDE - LUG_OUT + (r - R_NECK)
 
 
+def stadium(x0, x1, w, h, zc):
+    """Брусок уздовж X перерізом як роз'єм USB-C: прямокутник із півколами по боках."""
+    r = h / 2
+    body = box(x0, x1, -(w / 2 - r), w / 2 - r, zc - r, zc + r)
+    for sy in (1, -1):
+        body += Manifold.cylinder(x1 - x0, r, r).rotate([0, 90, 0]).translate([x0, sy * (w / 2 - r), zc])
+    return body
+
+
 def make_base():
     shell = revolve([(0, 0), (R_OUT - 0.8, 0), (R_OUT, 0.8), (R_OUT, Z_SHOULDER), (R_NECK, Z_SHOULDER),
                      (R_NECK, Z_NECK), (R_IN, Z_NECK), (R_IN, FLOOR), (0, FLOOR)])
     inside = cyl(R_IN + 0.5, FLOOR - 0.01, Z_NECK)   # усе, що додаємо всередину, обрізаємо цим (з перекриттям у стінку)
-
-    parts = [
-        box(X_FRONT, 20, -20, 20, FLOOR, Z_POCKET),                        # передній упор плати
-        box(X_REAR - 1, X_FRONT, -4, 4, FLOOR, Z_PCB),                         # опорне ребро по центру, між рядами пінів
-        box(-20, X_REAR, -5, 5, FLOOR, Z_PCB_TOP + 1.3),                   # задній упор
-    ]
-    # Гачок на задньому упорі: плата заводиться під нього заднім краєм
-    hook = CrossSection([[(X_REAR - 0.5, Z_PCB_TOP - 0.5), (X_REAR + 0.8, Z_PCB_TOP + 0.8),
-                          (X_REAR + 0.8, Z_PCB_TOP + 1.3), (X_REAR - 0.5, Z_PCB_TOP + 1.3)]])
-    parts.append(Manifold.extrude(hook, 9.6).rotate([90, 0, 0]).translate([0, 4.8, 0]))
     side = PCB_W / 2 + PCB_CLR
+
+    parts = [box(X_BACK + 1.5, X_FRONT + 2, -4, 4, FLOOR, Z_PCB)]       # опорне ребро по центру, між рядами пінів
     for sy in (1, -1):
         y0, y1 = sorted((sy * side, sy * 20))
-        parts.append(box(-9, -6, y0, y1, FLOOR, Z_POCKET))                 # бічні напрямні ззаду
-        # Пара ребер: напрямні плати і паз для ніжки рамки між ними
+        parts.append(box(X_BACK, X_BACK + 5, y0, y1, FLOOR, Z_PCB_TOP + 0.5))     # бічні напрямні ззаду
+        # Пара ребер з пазом для засувки між ними, збоку від плати
+        y0, y1 = sorted((sy * (side + 0.2), sy * 20))
         parts.append(box(CLAMP_X0 - CLAMP_FIT - 1.8, CLAMP_X0 - CLAMP_FIT, y0, y1, FLOOR, 8.0))
-        parts.append(box(CLAMP_X0 + CLAMP_T + CLAMP_FIT, CLAMP_X0 + CLAMP_T + CLAMP_FIT + 1.8, y0, y1, FLOOR, 8.0))
     base = shell + (Manifold.batch_boolean(parts, OpType.Add) ^ inside)
 
     for a in lug_angles():
@@ -148,19 +159,34 @@ def make_base():
     for a in (90, 270):  # шипи на шийці: не дають диску провертатись разом з ковпаком
         base += revolve([(R_IN + 0.15, Z_NECK - 0.2), (R_NECK - 0.15, Z_NECK - 0.2), (R_NECK - 0.15, Z_NECK + 1.0),
                          (R_IN + 0.15, Z_NECK + 1.0)], 10, a - 5)
-    tunnel = box(X_FRONT - 2, 30, -TUNNEL_W / 2, TUNNEL_W / 2, Z_USB_MID - TUNNEL_H / 2, Z_USB_MID + TUNNEL_H / 2)
-    return base - tunnel
+    # Кишеня в стінці під передній край плати: знизу лишається ребро, згори — місце під припій
+    pocket = box(11, X_FRONT + FRONT_GAP, -side, side, FLOOR - 0.2, Z_PCB_TOP + SOLDER_UP) - box(0, 30, -3.9, 3.9, FLOOR - 1, Z_PCB)
+    window = stadium(0, 30, USB_W + 2 * USB_FIT, USB_H + 2 * USB_FIT, Z_USB_MID)
+    flat = box(X_FLAT, 30, -30, 30, -1, Z_SHOULDER + 0.01)
+    return base - pocket - window - flat
 
 
 def make_clamp():
-    """Рамка в площині YZ: ніжки стоять на дні, нижня перекладина тисне на USB-роз'єм, верхня підпирає диск."""
+    """Засувка: пластина впоперек позаду плати, стоїть на дні в пазах. Не дає платі відсунутись, коли вставляють
+    штекер, а виступ згори не дає задньому краю піднятись. Зверху засувку тримає диск."""
     z0, z1 = FLOOR, Z_NECK - CLAMP_SHORT
-    beam0 = Z_USB_TOP - 0.15              # легкий натяг; перекладина тонка і пружинить
-    beam1 = beam0 + 1.4
-    outer = box(CLAMP_X0, CLAMP_X0 + CLAMP_T, -CLAMP_Y_OUT, CLAMP_Y_OUT, z0, z1)
-    lower = box(0, 20, -CLAMP_Y_IN, CLAMP_Y_IN, z0 - 1, beam0)
-    window = box(0, 20, -CLAMP_Y_IN, CLAMP_Y_IN, beam1, z1 - 2.5)
-    return outer - lower - window
+    plate = box(CLAMP_X0, CLAMP_X0 + CLAMP_T, -CLAMP_Y, CLAMP_Y, z0, z1)
+    lip = box(CLAMP_X0 + CLAMP_T - 0.01, X_BACK + CLAMP_LIP, -CLAMP_LIP_W / 2, CLAMP_LIP_W / 2, Z_PCB_TOP, Z_PCB_TOP + 1.3)
+    return plate + lip
+
+
+def usb_fit_test():
+    """Пробник: шматок передньої стінки з вікнами під роз'єм із різним зазором — 0; 0,05; 0,10; 0,15; 0,20 мм.
+    Друкується стоячи, як стінка в основі: вікна на тій самій висоті й так само лежать шари. Риски згори: одна — найтісніше."""
+    fits = (0.0, 0.05, 0.10, 0.15, 0.20)
+    t, pitch, h = 2.0, 12.0, 10.0
+    m = box(0, t, 0, pitch * len(fits), 0, h) + box(-2, t + 2, 0, pitch * len(fits), 0, 1.0)   # стінка на ніжці
+    for n, f in enumerate(fits):
+        yc = pitch * (n + 0.5)
+        m -= stadium(-3, t + 3, USB_W + 2 * f, USB_H + 2 * f, Z_USB_MID).translate([0, yc, 0])
+        for k in range(n + 1):
+            m += box(0, t, yc - 2 + k * 1.0, yc - 1.6 + k * 1.0, h, h + 0.6)
+    return m
 
 
 def slot(radius, x0, x1):
@@ -249,7 +275,7 @@ def make_dome():
 def dummy_board():
     """Плата з роз'ємом — лише для перевірки зазорів."""
     pcb = box(X_FRONT - PCB_L, X_FRONT, -PCB_W / 2, PCB_W / 2, Z_PCB, Z_PCB_TOP)
-    usb = box(X_FRONT + USB_OVERHANG - USB_LEN, X_FRONT + USB_OVERHANG, -USB_W / 2, USB_W / 2, Z_PCB_TOP, Z_USB_TOP)
+    usb = stadium(X_FRONT + USB_OVERHANG - USB_LEN, X_FRONT + USB_OVERHANG, USB_W, USB_H, Z_USB_MID)
     return pcb + usb
 
 
@@ -268,7 +294,7 @@ def print_pose(name, m):
     if name in ("dome", "diffuser"):
         m = m.rotate([180, 0, 0])          # ковпак і розсіювач друкуються догори дном
     if name == "clamp":
-        m = m.rotate([0, 90, 0])           # рамка лежить плазом
+        m = m.rotate([0, -90, 0])          # засувка лежить плазом, виступом догори
     lo = m.bounding_box()[:3]
     return m.translate([-lo[0], -lo[1], -lo[2]])
 
@@ -297,4 +323,5 @@ if __name__ == "__main__":
         print(f"{name:8s} {bb[3]:.1f} x {bb[4]:.1f} x {bb[5]:.1f} мм, {built[name].volume() / 1000:.1f} см³")
     for plate, names in PLATES.items():
         export_plate(out / f"{plate}.3mf", {n: posed[n] for n in names})
+    to_trimesh(print_pose("usb_fit_test", usb_fit_test())).export(out / "usb_fit_test.stl")
     print(f"Зібраний корпус: Ø{2 * R_OUT:.0f} x {HEIGHT:.1f} мм")
